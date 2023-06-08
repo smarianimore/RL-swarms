@@ -1,6 +1,6 @@
 {
   "population": 0,
-  "learner_population": 2,
+  "learner_population": 100,
   "sniff_threshold": 0.9,
   "diffuse_area": 2,
   "diffuse_mode": "cascade",
@@ -13,7 +13,7 @@
   "cluster_radius": 5,
   "rew": 100,
   "penalty": -1,
-  "episode_ticks": 10,
+  "episode_ticks": 500,
   "W": 66,
   "H": 38,
   "PATCH_SIZE": 20,

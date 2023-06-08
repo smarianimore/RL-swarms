@@ -56,7 +56,7 @@ class Slime(gym.Env):
                                         'rng' = random visiting
                                         'sorted' = diffuse first the patches with more pheromone
                                         'filter' = do not re-diffuse patches receiving pheromone due to diffusion
-                                        'cascade' = step-by-step diffusion within 'diffuse_area'
+                                        'cascade' = step-by-step, incremental (recursive) diffusion within 'diffuse_area'
         :param follow_mode          Controls how non-learning agents follow pheromone:
                                         'det' = follow greatest pheromone
                                         'prob' = follow greatest pheromone probabilistically (pheromone strength as weight)
