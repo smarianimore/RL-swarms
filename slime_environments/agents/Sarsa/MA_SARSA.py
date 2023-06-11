@@ -125,7 +125,7 @@ def eval(env,
          qtable,
          test_log_every:int,
          epsilon:float,):
-    # DOC Evaluate agent's performance after Q-learning
+    # DOC Evaluate agent's performance after SARSA
     cluster_dict = {}
     print("Start testing...")
     

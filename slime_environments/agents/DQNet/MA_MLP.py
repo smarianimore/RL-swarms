@@ -6,37 +6,41 @@ import os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from utils.utils import read_params, setup, state_to_int_map
+from utils.utils import read_params, setup
 from DQN import DQN, ReplayMemory
 
 import argparse
 
 import os
 import math
+import json
 import random
 import datetime
 from collections import namedtuple
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-def select_action(env, agent, state, steps_done, l_params, policy_net, device):
+random.seed(0)
+
+def select_action(env, agent, state, steps_done, policy_net, device, epsilon_end, decay):
     sample = random.random()
-    eps_threshold = l_params["epsilon_end"] + (l_params["epsilon"] - l_params["epsilon_end"]) * math.exp(-1. * steps_done / l_params["decay"])
-    steps_done += 1
+    eps_threshold = epsilon_end + (policy_net.epsilon - epsilon_end) * math.exp(-1. * steps_done / decay)
+    policy_net.epsilon = eps_threshold
     
     if sample > eps_threshold:
         with torch.no_grad():
             # t.max(1) will return the largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            return steps_done, policy_net(state).max(1)[1].view(1, 1), policy_net, eps_threshold
+            return policy_net(state).max(1)[1].view(1, 1), policy_net
     else:
-        return steps_done, torch.tensor([[env.action_space(agent).sample()]], device=device, dtype=torch.long), policy_net, eps_threshold
+        return torch.tensor([[env.action_space(agent).sample()]], device=device, dtype=torch.long), policy_net
 
 
-def optimize_model(Transition, memory, policy_net, target_net, optimizer, gamma, batch_size, device):
+def optimize_model(Transition, memory, policy_net, target_net, gamma, batch_size, device):
     if len(memory) < batch_size:
         return
     
@@ -73,68 +77,50 @@ def optimize_model(Transition, memory, policy_net, target_net, optimizer, gamma,
     # Compute Huber loss
     criterion = nn.SmoothL1Loss()
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-
-    # Optimize the model
-    optimizer.zero_grad()
-    loss.backward()
-    # In-place gradient clipping
-    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
-    optimizer.step()
     
-    return policy_net, target_net, optimizer
+    return policy_net, target_net, loss
     
     
-def main(args):
-    params, l_params = read_params(args.params_path, args.learning_params_path)
-    env = Slime(render_mode="human", **params)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[INFO] Device selected: {device}")
-
+def train(env, 
+          params, 
+          l_params, 
+          device, 
+          policy_net, 
+          target_net, 
+          curdir,
+          train_episodes,
+          train_log_every,
+          output_file):
     Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(params, l_params)
 
-    # BATCH_SIZE is the number of transitions sampled from the replay buffer
-    # GAMMA is the discount factor as mentioned in the previous section
-    # EPS_START is the starting value of epsilon
-    # EPS_END is the final value of epsilon
-    # EPS_DECAY controls the rate of exponential decay of epsilon, higher means a slower decay
-    # TAU is the update rate of the target network
-    # LR is the learning rate of the ``AdamW`` optimizer
     batch_size = l_params["batch_size"]
     learning_rate = l_params["lr"]
     epsilon = l_params["epsilon"]
-
-    # Get number of actions from gym action space
+    epsilon_end = l_params["epsilon_end"]
+    alpha = l_params["alpha"]
+    gamma = l_params["gamma"]
+    decay = l_params["decay"]
     n_actions = len(l_params["actions"])
-    # Get the number of state observations
-    n_observations = 2
-    policy_net = DQN(n_observations, n_actions).to(device)
-    target_net = DQN(n_observations, n_actions).to(device)
+    population = params['population']
+    learner_population = params['learner_population']
     
-    curdir = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.isdir(os.path.join(curdir, "models")):
-        os.makedirs(os.path.join(curdir, "models"))
-        
-    if os.path.isfile(os.path.join(curdir, "models", args.policy_model_name)) and \
-        os.path.isfile(os.path.join(curdir, "models", args.target_model_name)):
-        policy_model_path = os.path.join(curdir, "models", args.policy_model_name)
-        target_model_path = os.path.join(curdir, "models", args.target_model_name)
-        policy_net.load_state_dict(torch.load(policy_model_path), strict=False)
-        target_net.load_state_dict(torch.load(target_model_path), strict=False)
-    else:
-        target_net.load_state_dict(policy_net.state_dict())
-
     optimizer = optim.AdamW(policy_net.parameters(), lr=learning_rate, amsgrad=True)
-    
     memory = {i: ReplayMemory(Transition, 1000) for i in range(params['learner_population'])}
+    
     old_s = {}
     cluster_dict = {}
-    steps_done = 0    
-    for ep in range(1, test_episodes + 1):
+    
+    actions_dict = {str(ep): {str(ac): 0 for ac in range(n_actions)} for ep in range(1, train_episodes + 1)}  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
+    action_dict = {str(ep): {str(ag): {str(ac): 0 for ac in range(n_actions)} for ag in range(population, population + learner_population)} for ep in range(1, train_episodes + 1)}
+    reward_dict = {str(ep): {str(ag): 0 for ag in range(population, population + learner_population)} for ep in range(1, train_episodes + 1)}
+   
+    for ep in range(1, train_episodes + 1):
         env.reset()
+        loss = 0
+        
         # Initialize the environment and get it's state
-        for tick in range(1, params['episode_ticks'] + 1):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1)):
+            losses = []
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 next_state, reward, _, _  = env.last(agent)
                 next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device).unsqueeze(0)
@@ -144,25 +130,41 @@ def main(args):
                     action = torch.tensor([action], dtype=torch.long, device=device).unsqueeze(0)
                 else:
                     state = old_s[agent]
-                    steps_done, action, policy_net, epsilon = select_action(env, agent, next_state, steps_done, l_params, policy_net, device)
+                    action, policy_net = select_action(env, agent, state, ep, policy_net, device, epsilon_end, decay)
                     reward = torch.tensor([reward], device=device)
                     
                     # Store the transition in memory
                     memory[agent].push(state, action, next_state, reward)
                     
                     # Perform one step of the optimization (on the policy network)
-                    policy_net, target_net, optimizer = optimize_model(Transition, memory[agent], policy_net, target_net, optimizer, gamma, batch_size, device)
-
+                    policy_net, target_net, loss_single = optimize_model(Transition, memory[agent], policy_net, target_net, gamma, batch_size, device)
+                    losses.append(loss_single)
+                    
                     # Soft update of the target network's weights
                     # θ′ ← τ θ + (1 −τ )θ′
                     target_net_state_dict = target_net.state_dict()
                     policy_net_state_dict = policy_net.state_dict()
                     for key in policy_net_state_dict:
-                        target_net_state_dict[key] = policy_net_state_dict[key]*alpha + target_net_state_dict[key]*(1-alpha)
+                        target_net_state_dict[key] = policy_net_state_dict[key] * alpha + target_net_state_dict[key] * (1 - alpha)
                     target_net.load_state_dict(target_net_state_dict)
                     
                 env.step(action.item())
                 old_s[agent] = next_state
+                
+                actions_dict[str(ep)][str(action.item())] += 1
+                action_dict[str(ep)][str(agent)][str(action.item())] += 1
+                reward_dict[str(ep)][str(agent)] += round(reward.item(), 2) if isinstance(reward, torch.Tensor) else round(reward, 2)
+                
+            if len(losses):
+                # Optimize the model
+                optimizer.zero_grad()
+                loss = sum(losses) / len(losses)
+                loss.backward()
+                
+                # In-place gradient clipping
+                torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+                optimizer.step()
+                
             env.move()
             env._evaporate()
             env._diffuse()
@@ -170,8 +172,18 @@ def main(args):
             
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         if ep % train_log_every == 0:
-            print(f"EPISODE: {ep}")
-            print(f"\tepsilon: {epsilon}")
+            print(f"EPISODE: {ep}\tepsilon: {policy_net.epsilon}\tavg loss: {loss}")
+            
+            with open(output_file, 'a') as f:
+                f.write(f"{ep}, {params['episode_ticks'] * ep}, {cluster_dict[str(ep)]}, {actions_dict[str(ep)]['2']}, {actions_dict[str(ep)]['0']}, {actions_dict[str(ep)]['1']}, ")
+                avg_rew = 0
+                
+                for l in range(params['population'], params['population'] + params['learner_population']):
+                    avg_rew += (reward_dict[str(ep)][str(l)] / params['episode_ticks'])
+                    f.write(f"{action_dict[str(ep)][str(l)]['2']}, {action_dict[str(ep)][str(l)]['0']}, {action_dict[str(ep)][str(l)]['1']}, ")
+                
+                avg_rew /= params['learner_population']
+                f.write(f"{avg_rew}\n")
                     
     #print(json.dumps(cluster_dict, indent=2))
     print("Training finished!\n")
@@ -181,12 +193,88 @@ def main(args):
     torch.save(policy_net.state_dict(), os.path.join(curdir, "models", policy_model_name))
     torch.save(target_net.state_dict(), os.path.join(curdir, "models", target_model_name))
 
+    return policy_net, env
+
+
+def test(env, params, l_params, policy_net, test_episodes, test_log_every, device):
+    cluster_dict = {}
+    print("[INFO] Start testing...")
+    
+    epsilon_end = l_params["epsilon_end"]
+    epsilon_test = l_params["epsilon_test"]
+    decay = l_params["decay"]
+    
+    for ep in range(1, test_episodes + 1):
+        env.reset()
+        for tick in range(1, params['episode_ticks'] + 1):
+            for agent in env.agent_iter(max_iter=params['learner_population']):
+                state, reward, _, _  = env.last(agent)
+                state = torch.tensor(state.observe(), dtype=torch.float32, device=device).unsqueeze(0)
+                action, policy_net = select_action(env, agent, state, ep, l_params, policy_net, device, epsilon_test, epsilon_end, decay)
+                env.step(action)
+                
+            env.move()
+            env._evaporate()
+            env._diffuse()
+            env.render()
+            
+        if ep % test_log_every == 0:
+            print(f"EPISODE: {ep}")
+            print(f"\tepsilon: {policy_net.epsilon}")
+            # print(f"\tepisode reward: {reward_episode}")
+        cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
+        
+    print(json.dumps(cluster_dict, indent=2))
+    print("Testing finished!\n")
+
+
+def main(args):
+    params, l_params = read_params(args.params_path, args.learning_params_path)
+    curdir = os.path.dirname(os.path.abspath(__file__))
+    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(params, l_params)
+    env = Slime(render_mode="human", **params)    
+    
+    if not os.path.isdir(os.path.join(curdir, "models")):
+        os.makedirs(os.path.join(curdir, "models"))
+    
+    n_actions = len(l_params["actions"])
+    n_observations = 2
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[INFO] Device selected: {device}")
+    
+    policy_net = DQN(n_observations, n_actions, epsilon).to(device)
+    target_net = DQN(n_observations, n_actions, epsilon).to(device)
+    
+    
+    if args.resume or args.test:
+        if os.path.isfile(os.path.join(curdir, "models", args.policy_model_name)) and \
+            os.path.isfile(os.path.join(curdir, "models", args.target_model_name)):
+            policy_model_path = os.path.join(curdir, "models", args.policy_model_name)
+            target_model_path = os.path.join(curdir, "models", args.target_model_name)
+            policy_net.load_state_dict(torch.load(policy_model_path), strict=False)
+            target_net.load_state_dict(torch.load(target_model_path), strict=False)
+    else:
+        target_net.load_state_dict(policy_net.state_dict())
+    
+    if args.train:
+        policy_net, env = train(env, params, l_params, device, policy_net, target_net, curdir, train_episodes, train_log_every, output_file)
+        
+    if args.test:
+        test(env, params, l_params, policy_net, test_episodes, test_log_every, device)
+
+    env.close()
+    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("params_path", type=str)
     parser.add_argument("learning_params_path", type=str)
     parser.add_argument("--policy-model-name", type=str, default="")
     parser.add_argument("--target-model-name", type=str, default="")
+    parser.add_argument("--train", action="store_true")
+    parser.add_argument("--test", action="store_true")
+    parser.add_argument("--resume", action="store_true")
     
     args = parser.parse_args()
     
