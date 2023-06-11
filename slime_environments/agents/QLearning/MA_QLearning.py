@@ -1,8 +1,15 @@
 from slime_environments.environments.SlimeEnvMultiAgent import Slime
-from slime_environments.agents.utils.utils import read_params, state_to_int_map, setup
+
+import sys
+import os
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+
+from utils.utils import read_params, state_to_int_map, setup
+
 import argparse
 
-import os
 import json
 import numpy as np
 import random

@@ -1,5 +1,13 @@
 from slime_environments.environments.SlimeEnvMultiAgent import Slime
-from slime_environments.agents.utils.utils import read_params, setup, state_to_int_map
+
+import sys
+import os
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+
+from utils.utils import read_params, state_to_int_map, setup
+
 import argparse
 
 import os
@@ -153,9 +161,15 @@ def eval(env,
 
 def main(args):
     params, l_params = read_params(args.params_path, args.learning_params_path)
-    env, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(params, l_params)
-    qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params, train_episodes)
+    
+    env = Slime(render_mode="human", **params)
+    
+    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(params, l_params)
+    
+    qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
+    
     env, qtable = train(env, params, qtable, actions_dict, action_dict, reward_dict, cluster_dict, train_episodes, train_log_every, alpha, gamma, decay, epsilon, output_file)
+    
     eval(env, params, test_episodes, qtable, test_log_every, epsilon)
 
 if __name__ == "__main__":

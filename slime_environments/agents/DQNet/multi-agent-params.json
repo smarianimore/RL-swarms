@@ -1,5 +1,4 @@
 {
-  "lr": 1e-4,
   "population": 0,
   "learner_population": 100,
   "sniff_threshold": 0.9,
