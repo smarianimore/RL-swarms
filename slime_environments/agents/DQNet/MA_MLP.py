@@ -28,7 +28,6 @@ random.seed(0)
 def select_action(env, agent, state, steps_done, policy_net, device, epsilon_end, decay):
     sample = random.random()
     eps_threshold = epsilon_end + (policy_net.epsilon - epsilon_end) * math.exp(-1. * steps_done / decay)
-    policy_net.epsilon = eps_threshold
     
     if sample > eps_threshold:
         with torch.no_grad():
@@ -95,7 +94,6 @@ def train(env,
 
     batch_size = l_params["batch_size"]
     learning_rate = l_params["lr"]
-    epsilon = l_params["epsilon"]
     epsilon_end = l_params["epsilon_end"]
     alpha = l_params["alpha"]
     gamma = l_params["gamma"]
@@ -119,7 +117,7 @@ def train(env,
         loss = 0
         
         # Initialize the environment and get it's state
-        for tick in tqdm(range(1, params['episode_ticks'] + 1)):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"epsilon: {policy_net.epsilon}"):
             losses = []
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 next_state, reward, _, _  = env.last(agent)
@@ -151,6 +149,8 @@ def train(env,
                 env.step(action.item())
                 old_s[agent] = next_state
                 
+                policy_net.epsilon = epsilon_end + (policy_net.epsilon - epsilon_end) * math.exp(-1. * ep / decay)
+                
                 actions_dict[str(ep)][str(action.item())] += 1
                 action_dict[str(ep)][str(agent)][str(action.item())] += 1
                 reward_dict[str(ep)][str(agent)] += round(reward.item(), 2) if isinstance(reward, torch.Tensor) else round(reward, 2)
@@ -169,6 +169,7 @@ def train(env,
             env._evaporate()
             env._diffuse()
             env.render()
+            
             
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         if ep % train_log_every == 0:
