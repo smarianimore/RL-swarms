@@ -1,6 +1,11 @@
 import os
 import json
+import math
 import datetime
+import matplotlib.pyplot as plt
+from typing import Optional
+from tqdm import tqdm
+import numpy as np
 
 def read_params(params_path:str, learning_params_path:str):
     params, l_params = dict(), dict()
@@ -31,9 +36,7 @@ def state_to_int_map(obs: list):
     return mapped
 
 
-def setup(params:dict, l_params:dict):
-    
-    curdir = os.path.dirname(os.path.abspath(__file__))
+def setup(curdir:str, params:dict, l_params:dict):
     if not os.path.isdir(os.path.join(curdir, "runs")):
         os.makedirs(os.path.join(curdir, "runs"))
     
@@ -70,6 +73,64 @@ def setup(params:dict, l_params:dict):
         for l in range(params['population'], params['population'] + params['learner_population']):
             for a in l_params["actions"]:
                 f.write(f"(learner {l})-{a}, ")
-        f.write("Avg reward X episode\n")
+        f.write("Avg reward X episode, loss, learning rate\n")
     
     return output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every
+
+
+def calculate_epsilon(type:str, episodes:int, ticks:int, learners:int, epsilon: float, decay:float, epsilon_end:Optional[float]):
+    indexes = []
+    values = []
+    
+    pbar = tqdm(range(episodes*ticks))
+    for ep in range(1, episodes + 1):
+        for tick in range(1, ticks + 1):
+            for agent in range(learners):
+                index = agent + tick * learners + ep * ticks * learners
+                indexes.append(index)
+                if ep == 1 and tick == 1:
+                    pass
+                else:
+                    if type.lower() in "normal":
+                        epsilon *= decay
+                    elif type.lower() == "esponential":
+                        epsilon = epsilon_end + (epsilon - epsilon_end) * math.exp(-1. * ep * decay)
+                    
+                values.append(epsilon)
+            pbar.update(1)
+                
+    plt.plot(indexes, values, marker='o')
+    plt.xlabel('Steps')
+    plt.ylabel('epsilon value')
+    plt.show()
+    print(f"Final value: {epsilon}")
+    
+
+def positional_encoding(sequence_length, d_model):
+    positions = np.arange(sequence_length)[:, np.newaxis]
+    angles = np.arange(d_model)[np.newaxis, :] / np.power(10000, 2 * (np.arange(d_model) // 2) / d_model)
+    encoding = positions * angles
+
+    encoding[:, 0::2] = np.sin(encoding[:, 0::2])  # Colonne pari: seno
+    encoding[:, 1::2] = np.cos(encoding[:, 1::2])  # Colonne dispari: coseno
+
+    return encoding
+
+
+def update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict):
+    with open(output_file, 'a') as f:
+        f.write(f"{ep}, {params['episode_ticks'] * ep}, {cluster_dict[str(ep)]}, {actions_dict[str(ep)]['2']}, {actions_dict[str(ep)]['0']}, {actions_dict[str(ep)]['1']}, ")
+        avg_rew = 0
+
+        for l in range(params['population'], params['population'] + params['learner_population']):
+            avg_rew += (reward_dict[str(ep)][str(l)] / params['episode_ticks'])
+            f.write(f"{action_dict[str(ep)][str(l)]['2']}, {action_dict[str(ep)][str(l)]['0']}, {action_dict[str(ep)][str(l)]['1']}, ")
+
+        avg_rew /= params['learner_population']
+        f.write(f"{avg_rew}\n")
+
+
+    
+if __name__ == "__main__":
+    array = np.array([1,2,3,4,5], dtype=np.float32)
+    calculate_epsilon("esponential", 100, 512, 100, 0.9, 20e-9, 0.0)

@@ -14,7 +14,7 @@ import os
 import json
 import numpy as np
 import random
-
+from tqdm import tqdm
 
 def create_agent(params:dict, l_params:dict, train_episodes:int):
     n_actions = len(l_params["actions"])
@@ -57,7 +57,7 @@ def train(env,
     for ep in range(1, train_episodes + 1):
         env.reset()
         
-        for tick in range(1, params['episode_ticks'] + 1):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1)):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 cur_state, reward, _, _ = env.last(agent)
                 cur_s = state_to_int_map(cur_state.observe())
@@ -113,10 +113,10 @@ def train(env,
                 avg_rew /= params['learner_population']
                 f.write(f"{avg_rew}\n")
 
-    #print(json.dumps(cluster_dict, indent=2))
+    print(json.dumps(cluster_dict, indent=2))
     print("Training finished!\n")
     
-    return env, qtable
+    return env, qtable, epsilon
 
 
 def eval(env,
@@ -160,15 +160,19 @@ def eval(env,
 
 
 def main(args):
+    random.seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    curdir = os.path.dirname(os.path.abspath(__file__))
+    
     params, l_params = read_params(args.params_path, args.learning_params_path)
     
     env = Slime(render_mode="human", **params)
     
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(params, l_params)
+    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdirparams, l_params)
     
     qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
     
-    env, qtable = train(env, params, qtable, actions_dict, action_dict, reward_dict, cluster_dict, train_episodes, train_log_every, alpha, gamma, decay, epsilon, output_file)
+    env, qtable, epsilon = train(env, params, qtable, actions_dict, action_dict, reward_dict, cluster_dict, train_episodes, train_log_every, alpha, gamma, decay, epsilon, output_file)
     
     eval(env, params, test_episodes, qtable, test_log_every, epsilon)
 
@@ -176,6 +180,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("params_path", type=str)
     parser.add_argument("learning_params_path", type=str)
+    parser.add_argument("--random-seed", type=int, default=0)
     
     args = parser.parse_args()
     

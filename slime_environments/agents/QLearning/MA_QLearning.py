@@ -154,11 +154,15 @@ def eval(env,
 
 
 def main(args):
+    random.seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    curdir = os.path.dirname(os.path.abspath(__file__))
+    
     params, l_params = read_params(args.params_path, args.learning_params_path)
     
     env = Slime(render_mode="human", **params)
     
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(params, l_params)
+    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdir, params, l_params)
     
     qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
     

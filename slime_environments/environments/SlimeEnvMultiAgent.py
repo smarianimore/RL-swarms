@@ -650,6 +650,17 @@ class Slime(AECEnv):
             if self.screen is not None:
                 pygame.display.quit()
                 pygame.quit()
+                
+                
+    def get_neighborood_chemical(self, agent):
+        agent_pos = self.learners[agent]["pos"]
+        smell_patches = self.smell_patches[agent_pos]
+        
+        output_mask = []
+        for patch in smell_patches:
+            output_mask.append(self.patches[patch]["chemical"])
+
+        return np.array([output_mask], dtype=np.float32)
 
 
 if __name__ == "__main__":

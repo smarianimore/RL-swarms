@@ -1,0 +1,16 @@
+  {
+  "lr": 1e-3,
+  "batch_size": 64,
+  "alpha": 0.005,
+  "gamma": 0.8,
+  "epsilon": 0.90,
+  "epsilon_end": 0.00,
+  "epsilon_test": 0.0,
+  "decay": 2e-6,
+  "train_episodes": 100,
+  "TRAIN_LOG_EVERY": 1,
+  "test_episodes": 10,
+  "TEST_LOG_EVERY": 1,
+  "OUTPUT_FILE": "multi-test-01",
+  "actions": ["move-toward-chemical", "random-walk", "drop-chemical"]
+}
