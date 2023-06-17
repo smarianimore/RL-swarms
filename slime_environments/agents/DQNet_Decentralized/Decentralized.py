@@ -7,7 +7,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
 from utils.utils import read_params, setup, positional_encoding, update_summary
-from utils.DQN import DQN, ReplayMemory
+from utils.DQN import DQN, ReplayMemory, optimize_model, select_action
 
 import argparse
 
@@ -18,67 +18,10 @@ import random
 import datetime
 from collections import namedtuple
 from tqdm import tqdm
-import numpy as np
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
-
-
-def select_action(env, agent, state, steps_done, policy_net, device, epsilon_end, decay):
-    sample = random.random()
-    policy_net.epsilon = epsilon_end + (policy_net.epsilon - epsilon_end) * math.exp(-1. * steps_done * decay)
-    
-    if sample > policy_net.epsilon:
-        with torch.no_grad():
-            # t.max(1) will return the largest column value of each row.
-            # second column on max result is index of where max element was
-            # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1)[1].view(1, 1), policy_net
-    else:
-        return torch.tensor([[env.action_space(agent).sample()]], device=device, dtype=torch.long), policy_net
-
-
-def optimize_model(Transition, memory, policy_net, target_net, gamma, batch_size, device):
-    if len(memory) < batch_size:
-        return policy_net, target_net, None
-    
-    transitions = memory.sample(batch_size)
-    # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
-    # detailed explanation). This converts batch-array of Transitions
-    # to Transition of batch-arrays.
-    batch = Transition(*zip(*transitions))
-
-    # Compute a mask of non-final states and concatenate the batch elements
-    # (a final state would've been the one after which simulation ended)
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
-
-    # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-    # columns of actions taken. These are the actions which would've been taken
-    # for each batch state according to policy_net
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
-
-    # Compute V(s_{t+1}) for all next states.
-    # Expected values of actions for non_final_next_states are computed based
-    # on the "older" target_net; selecting their best reward with max(1)[0].
-    # This is merged based on the mask, such that we'll have either the expected
-    # state value or 0 in case the state was final.
-    next_state_values = torch.zeros(batch_size, device=device)
-    with torch.no_grad():
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0]
-    # Compute the expected Q values
-    expected_state_action_values = (next_state_values * gamma) + reward_batch
-
-    # Compute Huber loss
-    criterion = nn.SmoothL1Loss()
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-    
-    return policy_net, target_net, loss
     
     
 def train(env, 
@@ -90,7 +33,8 @@ def train(env,
           curdir,
           train_episodes,
           train_log_every,
-          output_file):
+          output_file,
+          normalize):
     Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
     batch_size = l_params["batch_size"]
@@ -104,7 +48,7 @@ def train(env,
     learner_population = params['learner_population']
     
     optimizers = {i: optim.AdamW(policy_nets[i].parameters(), lr=learning_rate, amsgrad=True) for i in range(params['learner_population'])}
-    schedulers = {i: StepLR(optimizers[i], step_size=1, gamma=0.99999999) for i in range(params['learner_population'])}
+    schedulers = {i: StepLR(optimizers[i], step_size=1, gamma=0.9945) for i in range(params['learner_population'])}
     memory = {i: ReplayMemory(Transition, batch_size) for i in range(params['learner_population'])}
     
     old_s = {}
@@ -126,11 +70,13 @@ def train(env,
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 next_state, reward, _, _  = env.last(agent)
                 next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device)
-                
+
                 new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                 pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
-                new_pherormone = pos_encoding + new_pherormone
                 
+                #normalization is done considering all the agents in the same patch dropping at the same time pherormone
+                new_pherormone = pos_encoding + new_pherormone if not normalize \
+                    else pos_encoding + (new_pherormone / (env.lay_amount * params['learner_population']))
                 next_state = torch.cat((torch.flatten(new_pherormone), next_state)).unsqueeze(0)
                 
                 if ep == 1 and tick == 1:
@@ -140,7 +86,10 @@ def train(env,
                     state = old_s[agent]
                     action = old_a[agent]
                     next_action, policy_nets[agent] = select_action(env, agent, next_state, ep, policy_nets[agent], device, epsilon_end, decay)
-                    reward = torch.tensor([reward], device=device)
+                    
+                    #normalization is done considering the max reward a single agent can receive
+                    reward = torch.tensor([reward], device=device) if not normalize \
+                        else torch.tensor([reward / params['rew']], device=device)
                     
                     # Store the transition in memory
                     memory[agent].push(state, action, next_state, reward)
@@ -192,8 +141,9 @@ def train(env,
                     
     #print(json.dumps(cluster_dict, indent=2))
     print("Training finished!\n")
+    env.reset()
     now = datetime.datetime.now()
-    for agent in env.agent_iter(max_iter=params['learner_population']):
+    for agent in range(params['learner_population']):
         policy_model_name = os.path.join(f"policy_{agent}_"  + now.strftime("%m_%d_%Y__%H_%M_%S") + ".pth")
         target_model_name = os.path.join(f"target_{agent}_"  + now.strftime("%m_%d_%Y__%H_%M_%S") + ".pth")
         torch.save(policy_nets[agent].state_dict(), os.path.join(curdir, "models", "policies", policy_model_name))
@@ -202,7 +152,7 @@ def train(env,
     return policy_nets, env
 
 
-def test(env, params, l_params, policy_net, test_episodes, test_log_every, device):
+def test(env, params, l_params, policy_net, test_episodes, test_log_every, device, normalize):
     cluster_dict = {}
     print("[INFO] Start testing...")
     
@@ -215,7 +165,13 @@ def test(env, params, l_params, policy_net, test_episodes, test_log_every, devic
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"epsilon: {policy_net.epsilon}"):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 state, reward, _, _  = env.last(agent)
-                state = torch.tensor(state.observe(), dtype=torch.float32, device=device).unsqueeze(0)
+                state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
+
+                new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                new_pherormone = pos_encoding + new_pherormone if not normalize \
+                    else pos_encoding + (new_pherormone / (env.lay_amount * params['learner_population']))
+                    
                 action, policy_net = select_action(env, agent, state, ep, policy_net, device, epsilon_end, decay)
                 env.step(action)
                 
@@ -276,10 +232,10 @@ def main(args):
             target_nets[ag].load_state_dict(policy_nets[ag].state_dict())
     
     if args.train:
-        policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, curdir, train_episodes, train_log_every, output_file)
+        policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, curdir, train_episodes, train_log_every, output_file, args.normalize_input)
         
     if args.test:
-        test(env, params, l_params, policy_nets, test_episodes, test_log_every, device)
+        test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, args.normalize_input)
 
     env.close()
     
@@ -290,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("learning_params_path", type=str)
     parser.add_argument("--policy-model-name", type=str, default="")
     parser.add_argument("--target-model-name", type=str, default="")
+    parser.add_argument("--normalize-input", action="store_true")
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--resume", action="store_true")

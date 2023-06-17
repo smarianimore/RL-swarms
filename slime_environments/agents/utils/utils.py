@@ -130,7 +130,10 @@ def update_summary(output_file, ep, params, cluster_dict, actions_dict, action_d
         f.write(f"{avg_rew}\n")
 
 
+def calc_final_lr(base_lr, gamma, step_size, iterations, batch_size):
+    print(base_lr * gamma ** ((iterations / batch_size) // step_size) )
+
     
 if __name__ == "__main__":
-    array = np.array([1,2,3,4,5], dtype=np.float32)
+    calc_final_lr(1e-3, .9945, 1, 51200, 128)
     calculate_epsilon("esponential", 100, 512, 100, 0.9, 20e-9, 0.0)

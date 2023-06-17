@@ -1,9 +1,9 @@
   {
   "lr": 1e-3,
-  "batch_size": 64,
+  "batch_size": 128,
   "alpha": 0.005,
   "gamma": 0.8,
-  "epsilon": 0.90,
+  "epsilon": 0.10,
   "epsilon_end": 0.00,
   "epsilon_test": 0.0,
   "decay": 2e-6,
