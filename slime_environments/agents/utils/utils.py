@@ -154,6 +154,15 @@ def video_from_images(output_dir, last_ep_dir):
             '-c:v', 'libx264', '-vf', 'fps=30', '-pix_fmt', 'yuv420p', os.path.join(output_dir, "images", last_ep_dir, "video.mp4")
             ], check=True)
     
+    
+def calc_evaporation(learners, lay_amount, decay):
+    x = 0
+    for i in range(1000):
+        x = x * decay + lay_amount * learners
+        print(x)
+        
+        
 if __name__ == "__main__":
-    calc_final_lr(1e-3, .9945, 1, 51200, 128)
-    calculate_epsilon("esponential", 100, 512, 100, 0.9, 20e-9, 0.0)
+    # calc_final_lr(1e-3, .9945, 1, 51200, 128)
+    # calculate_epsilon("esponential", 100, 512, 100, 0.9, 20e-9, 0.0)
+    calc_evaporation(100, 1, 0.8)

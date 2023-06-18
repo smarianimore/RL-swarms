@@ -65,6 +65,10 @@ def train(env,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
    
+    max_possible_reward = (((params['episode_ticks'] - 150)/params['episode_ticks']) * params['rew']) + \
+        ((params['learner_population'] / params["cluster_threshold"]) * (params['rew'] ** 2))
+    max_possible_pherormone = env.lay_amount * params['learner_population'] * 5
+    
     for ep in range(1, train_episodes + 1):
         env.reset()
         losses = []
@@ -80,7 +84,7 @@ def train(env,
                 
                 #normalization is done considering all the agents in the same patch dropping at the same time pherormone
                 new_pherormone = pos_encoding + new_pherormone if not normalize \
-                    else pos_encoding + (new_pherormone / (env.lay_amount * params['learner_population']))
+                    else pos_encoding + (new_pherormone / max_possible_pherormone)
                 next_state = torch.cat((torch.flatten(new_pherormone), next_state)).unsqueeze(0)
                 
                 if ep == 1 and tick == 1:
@@ -92,7 +96,7 @@ def train(env,
                     next_action, policy_net = select_action(env, agent, next_state, ep, policy_net, device, epsilon_end, decay)
                     #normalization is done considering the max reward a single agent can receive
                     reward = torch.tensor([reward], device=device) if not normalize \
-                        else torch.tensor([reward / params['rew']], device=device)
+                        else torch.tensor([reward / max_possible_reward], device=device)
                     
                     
                     # Store the transition in memory
