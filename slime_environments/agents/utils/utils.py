@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from typing import Optional
 from tqdm import tqdm
 import numpy as np
+import subprocess
+import cv2
+from typing import Optional
 
 def read_params(params_path:str, learning_params_path:str):
     params, l_params = dict(), dict()
@@ -41,7 +44,9 @@ def setup(curdir:str, params:dict, l_params:dict):
         os.makedirs(os.path.join(curdir, "runs"))
     
     filename = l_params['OUTPUT_FILE'].replace("-", "_") + "_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S") + ".csv"
-    output_file = os.path.join(curdir, "runs", filename)
+    output_dir =  os.path.join(curdir, "runs", "train" + "_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S"))
+    os.makedirs(output_dir)
+    output_file = os.path.join(curdir, "runs", output_dir, filename)
 
     # Q-Learning
     alpha = l_params["alpha"]  # DOC learning rate (0 learn nothing 1 learn suddenly)
@@ -75,7 +80,7 @@ def setup(curdir:str, params:dict, l_params:dict):
                 f.write(f"(learner {l})-{a}, ")
         f.write("Avg reward X episode, loss, learning rate\n")
     
-    return output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every
+    return output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every
 
 
 def calculate_epsilon(type:str, episodes:int, ticks:int, learners:int, epsilon: float, decay:float, epsilon_end:Optional[float]):
@@ -117,22 +122,37 @@ def positional_encoding(sequence_length, d_model):
     return encoding
 
 
-def update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict):
+def update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict, losses, cur_lr):
     with open(output_file, 'a') as f:
         f.write(f"{ep}, {params['episode_ticks'] * ep}, {cluster_dict[str(ep)]}, {actions_dict[str(ep)]['2']}, {actions_dict[str(ep)]['0']}, {actions_dict[str(ep)]['1']}, ")
         avg_rew = 0
-
+        
         for l in range(params['population'], params['population'] + params['learner_population']):
             avg_rew += (reward_dict[str(ep)][str(l)] / params['episode_ticks'])
             f.write(f"{action_dict[str(ep)][str(l)]['2']}, {action_dict[str(ep)][str(l)]['0']}, {action_dict[str(ep)][str(l)]['1']}, ")
-
+        
         avg_rew /= params['learner_population']
-        f.write(f"{avg_rew}\n")
+        f.write(f"{avg_rew}, {sum(losses)/len(losses)}, {cur_lr}\n")
 
 
 def calc_final_lr(base_lr, gamma, step_size, iterations, batch_size):
     print(base_lr * gamma ** ((iterations / batch_size) // step_size) )
+    
 
+def save_env_image(image, tick, output_dir, cur_ep_dir):
+    assert image is not None, "Environment error: render image is None" 
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    if not os.path.exists(os.path.join(output_dir, "images", cur_ep_dir)):
+        os.makedirs(os.path.join(output_dir, "images", cur_ep_dir))
+    cv2.imwrite(os.path.join(output_dir, "images", cur_ep_dir, f"{tick}.jpg"), image)
+
+
+def video_from_images(output_dir, last_ep_dir):
+    subprocess.run([
+            "ffmpeg", "-y", "-framerate", "30", "-i", os.path.join(output_dir, "images", last_ep_dir, "%d.jpg"), \
+            '-c:v', 'libx264', '-vf', 'fps=30', '-pix_fmt', 'yuv420p', os.path.join(output_dir, "images", last_ep_dir, "video.mp4")
+            ], check=True)
     
 if __name__ == "__main__":
     calc_final_lr(1e-3, .9945, 1, 51200, 128)

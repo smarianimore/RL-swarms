@@ -6,13 +6,12 @@ import os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from utils.utils import read_params, setup, positional_encoding, update_summary
+from utils.utils import read_params, save_env_image, setup, positional_encoding, update_summary, video_from_images
 from utils.DQN import DQN, ReplayMemory, optimize_model, select_action
 
 import argparse
 
 import os
-import math
 import json
 import random
 import datetime
@@ -30,10 +29,10 @@ def train(env,
           device, 
           policy_nets, 
           target_nets, 
-          curdir,
           train_episodes,
           train_log_every,
           output_file,
+          output_dir,
           normalize):
     Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
@@ -46,10 +45,12 @@ def train(env,
     n_actions = len(l_params["actions"])
     population = params['population']
     learner_population = params['learner_population']
+    update_net_every = l_params['update_net_every']
+    memory_capacity = l_params["memory_capacity"]
     
     optimizers = {i: optim.AdamW(policy_nets[i].parameters(), lr=learning_rate, amsgrad=True) for i in range(params['learner_population'])}
-    schedulers = {i: StepLR(optimizers[i], step_size=1, gamma=0.9945) for i in range(params['learner_population'])}
-    memory = {i: ReplayMemory(Transition, batch_size) for i in range(params['learner_population'])}
+    schedulers = {i: StepLR(optimizers[i], step_size=1, gamma=0.983) for i in range(params['learner_population'])}
+    memory = {i: ReplayMemory(Transition, memory_capacity) for i in range(params['learner_population'])}
     
     old_s = {}
     old_a = {}
@@ -101,7 +102,6 @@ def train(env,
                         optimizers[agent].zero_grad()
                         loss_single.backward()
                         losses.append(torch.Tensor.clone(loss_single.detach()))
-                        memory[agent].memory.clear()
                         
                         # In-place gradient clipping
                         torch.nn.utils.clip_grad_value_(policy_nets[agent].parameters(), 100)
@@ -110,11 +110,12 @@ def train(env,
                     
                     # Soft update of the target network's weights
                     # θ′ ← τ θ + (1 −τ )θ′
-                    target_net_state_dict = target_nets[agent].state_dict()
-                    policy_net_state_dict = policy_nets[agent].state_dict()
-                    for key in policy_net_state_dict:
-                        target_net_state_dict[key] = policy_net_state_dict[key] * alpha + target_net_state_dict[key] * (1 - alpha)
-                    target_nets[agent].load_state_dict(target_net_state_dict)
+                    if (agent + tick * learner_population + ep * params['episode_ticks'] * learner_population) % update_net_every == 0:
+                        target_net_state_dict = target_nets[agent].state_dict()
+                        policy_net_state_dict = policy_nets[agent].state_dict()
+                        for key in policy_net_state_dict:
+                            target_net_state_dict[key] = policy_net_state_dict[key] * alpha + target_net_state_dict[key] * (1 - alpha)
+                        target_nets[agent].load_state_dict(target_net_state_dict)
                     
                 epsilon = policy_nets[agent].epsilon
                 cur_lr = optimizers[agent].param_groups[0]['lr']
@@ -130,49 +131,72 @@ def train(env,
             env.move()
             env._evaporate()
             env._diffuse()
-            env.render()
+            image = env.render()
+            
+            if ep in [l_params["fist_saveimages_episode"], l_params["middle_saveimages_episode"], l_params["last_saveimages_episode"]]:
+                if not os.path.exists(os.path.join(output_dir, "images")):
+                        os.makedirs(os.path.join(output_dir, "images"))
+                
+                if ep == int(l_params["fist_saveimages_episode"]):
+                    save_env_image(image, tick, output_dir, "first_episode")
+                elif ep == int(l_params["middle_saveimages_episode"]):
+                    save_env_image(image, tick, output_dir, "middle_episode")
+                elif ep == int(l_params["last_saveimages_episode"]):
+                    save_env_image(image, tick, output_dir, "last_episode")
+            
+            elif ep == int(l_params["fist_saveimages_episode"]) + 1 and tick == 1:
+                video_from_images(output_dir, "first_episode")
+            elif ep == int(l_params["middle_saveimages_episode"]) + 1 and tick == 1:
+                video_from_images(output_dir, "middle_episode")
             
             
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         if ep % train_log_every == 0:
             print("EPISODE: {}\tepsilon: {:.5f}\tavg loss: {:.3f}\tlearning rate {:.10f}".format(ep, epsilon, sum(losses)/len(losses), cur_lr))
-            update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict)
+            update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict, losses, cur_lr)
             
                     
     #print(json.dumps(cluster_dict, indent=2))
     print("Training finished!\n")
+    video_from_images(output_dir, "last_episode")
+    
     env.reset()
     now = datetime.datetime.now()
     for agent in range(params['learner_population']):
         policy_model_name = os.path.join(f"policy_{agent}_"  + now.strftime("%m_%d_%Y__%H_%M_%S") + ".pth")
         target_model_name = os.path.join(f"target_{agent}_"  + now.strftime("%m_%d_%Y__%H_%M_%S") + ".pth")
-        torch.save(policy_nets[agent].state_dict(), os.path.join(curdir, "models", "policies", policy_model_name))
-        torch.save(target_nets[agent].state_dict(), os.path.join(curdir, "models", "targets", target_model_name))
+        torch.save(policy_nets[agent].state_dict(), os.path.join(output_dir, "models", "policies", policy_model_name))
+        torch.save(target_nets[agent].state_dict(), os.path.join(output_dir, "models", "targets", target_model_name))
 
     return policy_nets, env
 
 
-def test(env, params, l_params, policy_net, test_episodes, test_log_every, device, normalize):
+def test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, normalize):
     cluster_dict = {}
     print("[INFO] Start testing...")
     
     epsilon_end = l_params["epsilon_end"]
-    policy_net.epsilon = epsilon_test = l_params["epsilon_test"]
+    epsilon_test = l_params["epsilon_test"]
     decay = l_params["decay"]
     
     for ep in range(1, test_episodes + 1):
         env.reset()
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"epsilon: {policy_net.epsilon}"):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                state, reward, _, _  = env.last(agent)
-                state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
+                if ep == 1 and tick == 1:
+                    policy_nets[agent].epsilon = epsilon_test
+                next_state, reward, _, _  = env.last(agent)
+                next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device)
 
-                new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
-                pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
-                new_pherormone = pos_encoding + new_pherormone if not normalize \
-                    else pos_encoding + (new_pherormone / (env.lay_amount * params['learner_population']))
+                pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                pos_encoding = torch.tensor(positional_encoding(pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                
+                #normalization is done considering all the agents in the same patch dropping at the same time pherormone
+                pherormone = pos_encoding + pherormone if not normalize \
+                    else pos_encoding + (pherormone / (env.lay_amount * params['learner_population']))
+                state = torch.cat((torch.flatten(pherormone), next_state)).unsqueeze(0)
                     
-                action, policy_net = select_action(env, agent, state, ep, policy_net, device, epsilon_end, decay)
+                action, policy_net = select_action(env, agent, state, ep, policy_nets[agent], device, epsilon_end, decay)
                 env.step(action)
                 
             env.move()
@@ -196,17 +220,17 @@ def main(args):
     
     params, l_params = read_params(args.params_path, args.learning_params_path)
     curdir = os.path.dirname(os.path.abspath(__file__))
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdir, params, l_params)
+    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdir, params, l_params)
     env = Slime(render_mode="human", **params)    
     
-    if not os.path.isdir(os.path.join(curdir, "models")):
-        os.makedirs(os.path.join(curdir, "models"))
+    if not os.path.isdir(os.path.join(output_dir, "models")):
+        os.makedirs(os.path.join(output_dir, "models"))
         
-    if not os.path.isdir(os.path.join(curdir, "models", "policies")):
-        os.makedirs(os.path.join(curdir, "models", "policies"))
+    if not os.path.isdir(os.path.join(output_dir, "models", "policies")):
+        os.makedirs(os.path.join(output_dir, "models", "policies"))
         
-    if not os.path.isdir(os.path.join(curdir, "models", "targets")):
-        os.makedirs(os.path.join(curdir, "models", "targets"))
+    if not os.path.isdir(os.path.join(output_dir, "models", "targets")):
+        os.makedirs(os.path.join(output_dir, "models", "targets"))
     
     n_actions = len(l_params["actions"])
     n_observations = 100
@@ -219,8 +243,8 @@ def main(args):
     policy_nets = {ag: DQN(n_observations, n_actions, epsilon).to(device) for ag in range(population, population + learner_population)}
     target_nets = {ag: DQN(n_observations, n_actions, epsilon).to(device) for ag in range(population, population + learner_population)}
     
-    policies_path = os.path.join(curdir, "models", "policies")
-    targets_path = os.path.join(curdir, "models", "targets")
+    policies_path = os.path.join(output_dir, "models", "policies")
+    targets_path = os.path.join(output_dir, "models", "targets")
     if args.resume or args.test:
         if os.path.exists(policies_path) and os.path.exists(targets_path):
             policies = [os.path.join(root, file) for root, dirs, files in os.walk(policies_path) for file in files if os.path.isfile(os.path.join(root, file))]
@@ -230,18 +254,18 @@ def main(args):
             assert len(targets) == params['learner_population'], f"targets weights {len(targets)} and learner population {params['learner_population']} are different!"
             
             for i, file in enumerate(policies):
-                policy_model_path = os.path.join(curdir, "models", "policies", file)
+                policy_model_path = os.path.join(output_dir, "models", "policies", file)
                 policy_nets[i].load_state_dict(torch.load(policy_model_path), strict=False)
             
             for i, file in enumerate(targets):
-                target_model_path = os.path.join(curdir, "models", "targets", file)
+                target_model_path = os.path.join(output_dir, "models", "targets", file)
                 target_nets[i].load_state_dict(torch.load(target_model_path), strict=False)
     else:
         for ag in range(population, population + learner_population):
             target_nets[ag].load_state_dict(policy_nets[ag].state_dict())
     
     if args.train:
-        policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, curdir, train_episodes, train_log_every, output_file, args.normalize_input)
+        policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, train_episodes, train_log_every, output_file, output_dir, args.normalize_input)
         
     if args.test:
         test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, args.normalize_input)

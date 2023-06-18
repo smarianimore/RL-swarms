@@ -644,6 +644,7 @@ class Slime(AECEnv):
 
             self.clock.tick(self.fps)
             pygame.display.flip()
+            return pygame.surfarray.array3d(self.screen)
 
     def close(self):
         if self.gui:
