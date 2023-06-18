@@ -51,7 +51,7 @@ def train(env,
     memory_capacity = l_params["memory_capacity"]
     
     optimizer = optim.AdamW(policy_net.parameters(), lr=learning_rate, amsgrad=True)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.99983)
+    scheduler = StepLR(optimizer, step_size=1, gamma=l_params["step_lr"])
     memory = ReplayMemory(Transition, memory_capacity)
     
     old_s = {}

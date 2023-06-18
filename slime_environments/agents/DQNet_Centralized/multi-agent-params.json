@@ -1,10 +1,10 @@
 {
   "population": 0,
-  "learner_population": 50,
+  "learner_population": 100,
   "sniff_threshold": 0.8,
   "diffuse_area": 2,
   "diffuse_mode": "cascade",
-  "follow_mode": "det",
+  "follow_mode": "prob",
   "smell_area": 3,
   "lay_area": 1,
   "lay_amount": 3,
