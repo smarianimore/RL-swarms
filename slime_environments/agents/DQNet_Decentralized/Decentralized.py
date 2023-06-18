@@ -219,14 +219,23 @@ def main(args):
     policy_nets = {ag: DQN(n_observations, n_actions, epsilon).to(device) for ag in range(population, population + learner_population)}
     target_nets = {ag: DQN(n_observations, n_actions, epsilon).to(device) for ag in range(population, population + learner_population)}
     
+    policies_path = os.path.join(curdir, "models", "policies")
+    targets_path = os.path.join(curdir, "models", "targets")
     if args.resume or args.test:
-        if os.path.isfile(os.path.join(curdir, "models", args.policy_model_name)) and \
-            os.path.isfile(os.path.join(curdir, "models", args.target_model_name)):
-                raise NotImplementedError
-                policy_model_path = os.path.join(curdir, "models", args.policy_model_name)
-                target_model_path = os.path.join(curdir, "models", args.target_model_name)
-                policy_nets.load_state_dict(torch.load(policy_model_path), strict=False)
-                target_nets.load_state_dict(torch.load(target_model_path), strict=False)
+        if os.path.exists(policies_path) and os.path.exists(targets_path):
+            policies = [os.path.join(root, file) for root, dirs, files in os.walk(policies_path) for file in files if os.path.isfile(os.path.join(root, file))]
+            targets = [os.path.join(root, file) for root, dirs, files in os.walk(targets_path) for file in files if os.path.isfile(os.path.join(root, file))]
+
+            assert len(policies) == params['learner_population'], f"policies weights {len(policies)} and learner population {params['learner_population']} are different!"
+            assert len(targets) == params['learner_population'], f"targets weights {len(targets)} and learner population {params['learner_population']} are different!"
+            
+            for i, file in enumerate(policies):
+                policy_model_path = os.path.join(curdir, "models", "policies", file)
+                policy_nets[i].load_state_dict(torch.load(policy_model_path), strict=False)
+            
+            for i, file in enumerate(targets):
+                target_model_path = os.path.join(curdir, "models", "targets", file)
+                target_nets[i].load_state_dict(torch.load(target_model_path), strict=False)
     else:
         for ag in range(population, population + learner_population):
             target_nets[ag].load_state_dict(policy_nets[ag].state_dict())
