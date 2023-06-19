@@ -33,7 +33,8 @@ def train(env,
           train_log_every,
           output_file,
           output_dir,
-          normalize):
+          normalize,
+          positional_encoding):
     Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
     batch_size = l_params["batch_size"]
@@ -76,12 +77,17 @@ def train(env,
                 next_state, reward, _, _  = env.last(agent)
                 next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device)
 
-                new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
-                pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                if positional_encoding:
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                    pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                    new_pherormone = pos_encoding + new_pherormone 
+                else:
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent, True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                 
                 #normalization is done considering all the agents in the same patch dropping at the same time pherormone
-                new_pherormone = pos_encoding + new_pherormone if not normalize \
-                    else pos_encoding + (new_pherormone / max_possible_pherormone)
+                if normalize:
+                    new_pherormone /= max_possible_pherormone
+                    
                 next_state = torch.cat((torch.flatten(new_pherormone), next_state)).unsqueeze(0)
                 
                 if ep == 1 and tick == 1:
@@ -175,7 +181,7 @@ def train(env,
     return policy_nets, env
 
 
-def test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, normalize):
+def test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, normalize, positional_encoding):
     cluster_dict = {}
     print("[INFO] Start testing...")
     
@@ -183,22 +189,28 @@ def test(env, params, l_params, policy_nets, test_episodes, test_log_every, devi
     epsilon_test = l_params["epsilon_test"]
     decay = l_params["decay"]
     
+    max_possible_pherormone = env.lay_amount * params['learner_population'] * 5
     for ep in range(1, test_episodes + 1):
         env.reset()
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"epsilon: {policy_net.epsilon}"):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 if ep == 1 and tick == 1:
                     policy_nets[agent].epsilon = epsilon_test
-                next_state, reward, _, _  = env.last(agent)
-                next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device)
+                state, reward, _, _  = env.last(agent)
+                state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
 
-                pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
-                pos_encoding = torch.tensor(positional_encoding(pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                if positional_encoding:
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                    pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                    new_pherormone = pos_encoding + new_pherormone 
+                else:
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent, True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                 
                 #normalization is done considering all the agents in the same patch dropping at the same time pherormone
-                pherormone = pos_encoding + pherormone if not normalize \
-                    else pos_encoding + (pherormone / (env.lay_amount * params['learner_population']))
-                state = torch.cat((torch.flatten(pherormone), next_state)).unsqueeze(0)
+                if normalize:
+                    new_pherormone /= max_possible_pherormone
+                    
+                state = torch.cat((torch.flatten(new_pherormone), state)).unsqueeze(0)
                     
                 action, policy_net = select_action(env, agent, state, ep, policy_nets[agent], device, epsilon_end, decay)
                 env.step(action)
@@ -237,7 +249,10 @@ def main(args):
         os.makedirs(os.path.join(output_dir, "models", "targets"))
     
     n_actions = len(l_params["actions"])
-    n_observations = 100
+    if args.positional_encoding:
+        n_observations = 100
+    else:
+        n_observations = 51
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Device selected: {device}")
@@ -269,10 +284,10 @@ def main(args):
             target_nets[ag].load_state_dict(policy_nets[ag].state_dict())
     
     if args.train:
-        policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, train_episodes, train_log_every, output_file, output_dir, args.normalize_input)
+        policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, train_episodes, train_log_every, output_file, output_dir, args.normalize_input, args.positional_encoding)
         
     if args.test:
-        test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, args.normalize_input)
+        test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, args.normalize_input, args.positional_encoding)
 
     env.close()
     
@@ -284,6 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("--policy-model-name", type=str, default="")
     parser.add_argument("--target-model-name", type=str, default="")
     parser.add_argument("--normalize-input", action="store_true")
+    parser.add_argument("--positional-encoding", action="store_true")
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument("--resume", action="store_true")
