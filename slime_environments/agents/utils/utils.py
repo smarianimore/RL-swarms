@@ -39,13 +39,14 @@ def state_to_int_map(obs: list):
     return mapped
 
 
-def setup(curdir:str, params:dict, l_params:dict):
+def setup(is_train:bool, curdir:str, params:dict, l_params:dict):
     if not os.path.isdir(os.path.join(curdir, "runs")):
         os.makedirs(os.path.join(curdir, "runs"))
     
     filename = l_params['OUTPUT_FILE'].replace("-", "_") + "_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S") + ".csv"
     output_dir =  os.path.join(curdir, "runs", "train" + "_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S"))
-    os.makedirs(output_dir)
+    if is_train:
+        os.makedirs(output_dir)
     output_file = os.path.join(curdir, "runs", output_dir, filename)
 
     # Q-Learning
@@ -58,19 +59,20 @@ def setup(curdir:str, params:dict, l_params:dict):
     train_log_every = l_params["TRAIN_LOG_EVERY"]
     test_log_every = l_params["TEST_LOG_EVERY"]
 
-    with open(output_file, 'w') as f:
-        f.write(f"{json.dumps(params, indent=2)}\n")
-        f.write("----------\n")
-        f.write(f"TRAIN_EPISODES = {train_episodes}\n")
-        f.write(f"TEST_EPISODES = {test_episodes}\n")
-        f.write("----------\n")
-        f.write(f"alpha = {alpha}\n")
-        f.write(f"gamma = {gamma}\n")
-        f.write(f"epsilon = {epsilon}\n")
-        f.write(f"decay = {decay}\n")
-        f.write("----------\n")
-        # From NetlogoDataAnalysis: Episode, Tick, Avg cluster size X tick, Avg reward X episode, move-toward-chemical, random-walk, drop-chemical, (learner 0)-move-toward-chemical
-        f.write(f"Episode, Tick, Avg cluster size X tick, ")
+    if is_train:
+        with open(output_file, 'w') as f:
+            f.write(f"{json.dumps(params, indent=2)}\n")
+            f.write("----------\n")
+            f.write(f"TRAIN_EPISODES = {train_episodes}\n")
+            f.write(f"TEST_EPISODES = {test_episodes}\n")
+            f.write("----------\n")
+            f.write(f"alpha = {alpha}\n")
+            f.write(f"gamma = {gamma}\n")
+            f.write(f"epsilon = {epsilon}\n")
+            f.write(f"decay = {decay}\n")
+            f.write("----------\n")
+            # From NetlogoDataAnalysis: Episode, Tick, Avg cluster size X tick, Avg reward X episode, move-toward-chemical, random-walk, drop-chemical, (learner 0)-move-toward-chemical
+            f.write(f"Episode, Tick, Avg cluster size X tick, ")
         
         for a in l_params["actions"]:
             f.write(f"{a}, ")

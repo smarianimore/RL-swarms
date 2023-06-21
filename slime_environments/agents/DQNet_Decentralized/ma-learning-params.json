@@ -1,9 +1,9 @@
   {
   "lr": 3e-4,
-  "step_lr": 0.9999995,
+  "step_lr": 0.99992,
   "batch_size": 128,
   "memory_capacity": 51200,
-  "update_net_every": 64,
+  "update_net_every": 4,
   "alpha": 0.005,
   "gamma": 0.8,
   "epsilon": 0.90,

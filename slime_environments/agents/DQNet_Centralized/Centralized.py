@@ -165,7 +165,7 @@ def train(env,
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         if ep % train_log_every == 0:
             cur_lr = optimizer.param_groups[0]['lr']
-            print("EPISODE: {}\tepsilon: {:.5f}\tavg loss: {:.3f}\tlearning rate {:.10f}".format(ep, policy_net.epsilon, sum(losses)/len(losses), cur_lr))
+            print("EPISODE: {}\tepsilon: {:.5f}\tavg loss: {:.8f}\tlearning rate {:.10f}".format(ep, policy_net.epsilon, sum(losses)/len(losses), cur_lr))
             update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict, losses, cur_lr)
                     
     #print(json.dumps(cluster_dict, indent=2))
@@ -180,7 +180,7 @@ def train(env,
     return policy_net, env
 
 
-def test(env, params, l_params, policy_net, test_episodes, test_log_every, device, normalize, positional_encoding):
+def test(env, params, l_params, policy_net, test_episodes, test_log_every, device, normalize, pos_enc):
     cluster_dict = {}
     print("[INFO] Start testing...")
     
@@ -193,22 +193,27 @@ def test(env, params, l_params, policy_net, test_episodes, test_log_every, devic
         env.reset()
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"epsilon: {policy_net.epsilon}"):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                state, reward, _, _  = env.last(agent)
-                state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
-
-                if positional_encoding:
-                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
-                    pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
-                    new_pherormone = pos_encoding + new_pherormone 
+                if ep == 1 and tick == 1:
+                    next_action = env.action_space(agent).sample()
+                    next_action = torch.tensor([next_action], dtype=torch.long, device=device).unsqueeze(0)
                 else:
-                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent, True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
-                
-                #normalization is done considering all the agents in the same patch dropping at the same time pherormone
-                if normalize:
-                    new_pherormone /= max_possible_pherormone
-                
-                action, policy_net = select_action(env, agent, state, ep, policy_net, device, epsilon_end, decay)
-                env.step(action)
+                    state, reward, _, _  = env.last(agent)
+                    state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
+
+                    if pos_enc:
+                        new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                        pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
+                        new_pherormone = pos_encoding + new_pherormone 
+                    else:
+                        new_pherormone = torch.tensor(env.get_neighborood_chemical(agent, True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                    
+                    #normalization is done considering all the agents in the same patch dropping at the same time pherormone
+                    if normalize:
+                        new_pherormone /= max_possible_pherormone
+                    
+                    state = torch.cat((torch.flatten(new_pherormone), state)).unsqueeze(0)
+                    action, policy_net = select_action(env, agent, state, ep, policy_net, device, epsilon_end, decay)
+                    env.step(action)
                 
             env.move()
             env._evaporate()
@@ -231,10 +236,10 @@ def main(args):
     
     params, l_params = read_params(args.params_path, args.learning_params_path)
     curdir = os.path.dirname(os.path.abspath(__file__))
-    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdir, params, l_params)
+    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(args.train, curdir, params, l_params)
     env = Slime(render_mode="human", **params)    
     
-    if not os.path.isdir(os.path.join(output_dir, "models")):
+    if not os.path.isdir(os.path.join(output_dir, "models")) and args.train:
         os.makedirs(os.path.join(output_dir, "models"))
     
     n_actions = len(l_params["actions"])
@@ -249,11 +254,14 @@ def main(args):
     policy_net = DQN(n_observations, n_actions, epsilon).to(device)
     target_net = DQN(n_observations, n_actions, epsilon).to(device)
     
+    if args.models_path == "" or args.train:
+        args.model_path = output_dir
+    
     if args.resume or args.test:
-        if os.path.isfile(os.path.join(output_dir, "models", args.policy_model_name)) and \
-            os.path.isfile(os.path.join(output_dir, "models", args.target_model_name)):
-            policy_model_path = os.path.join(output_dir, "models", args.policy_model_name)
-            target_model_path = os.path.join(output_dir, "models", args.target_model_name)
+        if os.path.isfile(os.path.join(args.model_path, "models", args.policy_model_name)) and \
+            os.path.isfile(os.path.join(args.model_path, "models", args.target_model_name)):
+            policy_model_path = os.path.join(args.model_path, "models", args.policy_model_name)
+            target_model_path = os.path.join(args.model_path, "models", args.target_model_name)
             policy_net.load_state_dict(torch.load(policy_model_path), strict=False)
             target_net.load_state_dict(torch.load(target_model_path), strict=False)
     else:
@@ -274,6 +282,7 @@ if __name__ == "__main__":
     parser.add_argument("learning_params_path", type=str)
     parser.add_argument("--policy-model-name", type=str, default="")
     parser.add_argument("--target-model-name", type=str, default="")
+    parser.add_argument("--models-path", type=str, default="")
     parser.add_argument("--normalize-input", action="store_true")
     parser.add_argument("--positional-encoding", action="store_true")
     parser.add_argument("--train", action="store_true")

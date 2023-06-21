@@ -1,3 +1,4 @@
+import math
 from slime_environments.environments.SlimeEnvMultiAgent import Slime
 
 import sys
@@ -6,7 +7,7 @@ import os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from utils.utils import read_params, state_to_int_map, setup
+from utils.utils import read_params, save_env_image, state_to_int_map, setup, video_from_images
 
 import argparse
 
@@ -38,18 +39,20 @@ def create_agent(params:dict, l_params:dict, train_episodes:int):
 
 def train(env, 
           params:dict, 
-          qtable, 
+          l_params:dict,
+          qtable:dict, 
           actions_dict:dict, 
           action_dict:dict, 
           reward_dict:dict, 
           cluster_dict:dict,
           train_episodes:int, 
-          train_log_every, 
+          train_log_every:int, 
           alpha:float, 
           gamma:float, 
           decay:float,
           epsilon:float,
-          output_file):
+          output_file:str,
+          output_dir:str):
     # TRAINING
     print("Start training...")
     
@@ -81,7 +84,7 @@ def train(env,
                     action = next_action
                     
                 env.step(action)
-
+                epsilon = epsilon_end + (epsilon - epsilon_end) * math.exp(-1. * ep * decay)
                 old_s[agent] = cur_s
 
                 actions_dict[str(ep)][str(action)] += 1
@@ -91,16 +94,29 @@ def train(env,
             env.move()
             env._evaporate()
             env._diffuse()
-            env.render()
+            image = env.render()
             #print(json.dumps(action_dict, indent=2))
-        epsilon *= decay
+            
+            if ep in [l_params["fist_saveimages_episode"], l_params["middle_saveimages_episode"], l_params["last_saveimages_episode"]]:
+                if not os.path.exists(os.path.join(output_dir, "images")):
+                        os.makedirs(os.path.join(output_dir, "images"))
+                
+                if ep == int(l_params["fist_saveimages_episode"]):
+                    save_env_image(image, tick, output_dir, "first_episode")
+                elif ep == int(l_params["middle_saveimages_episode"]):
+                    save_env_image(image, tick, output_dir, "middle_episode")
+                elif ep == int(l_params["last_saveimages_episode"]):
+                    save_env_image(image, tick, output_dir, "last_episode")
+            
+            elif ep == int(l_params["fist_saveimages_episode"]) + 1 and tick == 1:
+                video_from_images(output_dir, "first_episode")
+            elif ep == int(l_params["middle_saveimages_episode"]) + 1 and tick == 1:
+                video_from_images(output_dir, "middle_episode")
+            
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         
         if ep % train_log_every == 0:
-            print(f"EPISODE: {ep}")
-            print(f"\tepsilon: {epsilon}")
-            #print(f"\tepisode reward: {reward_episode}")
-            # From NetlogoDataAnalysis: Episode, Tick, Avg cluster size X tick, move-toward-chemical (2), random-walk (0), drop-chemical (1), (learner 0)-move-toward-chemical, ..., Avg reward X episode
+            print("EPISODE: {}\tepsilon: {:.5f}".format(ep, epsilon))
             
             with open(output_file, 'a') as f:
                 f.write(f"{ep}, {params['episode_ticks'] * ep}, {cluster_dict[str(ep)]}, {actions_dict[str(ep)]['2']}, {actions_dict[str(ep)]['0']}, {actions_dict[str(ep)]['1']}, ")
@@ -165,14 +181,16 @@ def main(args):
     curdir = os.path.dirname(os.path.abspath(__file__))
     
     params, l_params = read_params(args.params_path, args.learning_params_path)
+    epsilon_end = l_params["epsilon_end"]
     
     env = Slime(render_mode="human", **params)
     
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdirparams, l_params)
+    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(True, curdir, params, l_params)
     
     qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
     
-    env, qtable, epsilon = train(env, params, qtable, actions_dict, action_dict, reward_dict, cluster_dict, train_episodes, train_log_every, alpha, gamma, decay, epsilon, output_file)
+    env, qtable, epsilon = train(env, params, l_params, qtable, actions_dict, action_dict, reward_dict, \
+        cluster_dict, train_episodes, train_log_every, alpha, gamma, decay, epsilon, epsilon_end, output_file, output_dir)
     
     eval(env, params, test_episodes, qtable, test_log_every, epsilon)
 

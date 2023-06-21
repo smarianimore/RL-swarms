@@ -34,7 +34,7 @@ def train(env,
           output_file,
           output_dir,
           normalize,
-          positional_encoding):
+          pos_enc):
     Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
     batch_size = l_params["batch_size"]
@@ -77,7 +77,7 @@ def train(env,
                 next_state, reward, _, _  = env.last(agent)
                 next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device)
 
-                if positional_encoding:
+                if pos_enc:
                     new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                     pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
                     new_pherormone = pos_encoding + new_pherormone 
@@ -162,7 +162,7 @@ def train(env,
             
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         if ep % train_log_every == 0:
-            print("EPISODE: {}\tepsilon: {:.5f}\tavg loss: {:.3f}\tlearning rate {:.10f}".format(ep, epsilon, sum(losses)/len(losses), cur_lr))
+            print("EPISODE: {}\tepsilon: {:.5f}\tavg loss: {:.8f}\tlearning rate {:.10f}".format(ep, epsilon, sum(losses)/len(losses), cur_lr))
             update_summary(output_file, ep, params, cluster_dict, actions_dict, action_dict, reward_dict, losses, cur_lr)
             
                     
@@ -181,7 +181,7 @@ def train(env,
     return policy_nets, env
 
 
-def test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, normalize, positional_encoding):
+def test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, normalize, pos_enc):
     cluster_dict = {}
     print("[INFO] Start testing...")
     
@@ -199,7 +199,7 @@ def test(env, params, l_params, policy_nets, test_episodes, test_log_every, devi
                 state, reward, _, _  = env.last(agent)
                 state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
 
-                if positional_encoding:
+                if pos_enc:
                     new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                     pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
                     new_pherormone = pos_encoding + new_pherormone 
@@ -236,16 +236,16 @@ def main(args):
     
     params, l_params = read_params(args.params_path, args.learning_params_path)
     curdir = os.path.dirname(os.path.abspath(__file__))
-    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdir, params, l_params)
+    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(args.train, curdir, params, l_params)
     env = Slime(render_mode="human", **params)    
     
-    if not os.path.isdir(os.path.join(output_dir, "models")):
+    if not os.path.isdir(os.path.join(output_dir, "models")) and args.train:
         os.makedirs(os.path.join(output_dir, "models"))
         
-    if not os.path.isdir(os.path.join(output_dir, "models", "policies")):
+    if not os.path.isdir(os.path.join(output_dir, "models", "policies")) and args.train:
         os.makedirs(os.path.join(output_dir, "models", "policies"))
         
-    if not os.path.isdir(os.path.join(output_dir, "models", "targets")):
+    if not os.path.isdir(os.path.join(output_dir, "models", "targets")) and args.train:
         os.makedirs(os.path.join(output_dir, "models", "targets"))
     
     n_actions = len(l_params["actions"])
@@ -262,8 +262,11 @@ def main(args):
     policy_nets = {ag: DQN(n_observations, n_actions, epsilon).to(device) for ag in range(population, population + learner_population)}
     target_nets = {ag: DQN(n_observations, n_actions, epsilon).to(device) for ag in range(population, population + learner_population)}
     
-    policies_path = os.path.join(output_dir, "models", "policies")
-    targets_path = os.path.join(output_dir, "models", "targets")
+    if args.models_path == "" or args.train:
+        args.model_path = output_dir
+        
+    policies_path = os.path.join(args.models_path, "models", "policies")
+    targets_path = os.path.join(args.models_path, "models", "targets")
     if args.resume or args.test:
         if os.path.exists(policies_path) and os.path.exists(targets_path):
             policies = [os.path.join(root, file) for root, dirs, files in os.walk(policies_path) for file in files if os.path.isfile(os.path.join(root, file))]
@@ -273,12 +276,10 @@ def main(args):
             assert len(targets) == params['learner_population'], f"targets weights {len(targets)} and learner population {params['learner_population']} are different!"
             
             for i, file in enumerate(policies):
-                policy_model_path = os.path.join(output_dir, "models", "policies", file)
-                policy_nets[i].load_state_dict(torch.load(policy_model_path), strict=False)
+                policy_nets[i].load_state_dict(torch.load(file), strict=False)
             
             for i, file in enumerate(targets):
-                target_model_path = os.path.join(output_dir, "models", "targets", file)
-                target_nets[i].load_state_dict(torch.load(target_model_path), strict=False)
+                target_nets[i].load_state_dict(torch.load(file), strict=False)
     else:
         for ag in range(population, population + learner_population):
             target_nets[ag].load_state_dict(policy_nets[ag].state_dict())
@@ -298,6 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("learning_params_path", type=str)
     parser.add_argument("--policy-model-name", type=str, default="")
     parser.add_argument("--target-model-name", type=str, default="")
+    parser.add_argument("--models-path", type=str, default="")
     parser.add_argument("--normalize-input", action="store_true")
     parser.add_argument("--positional-encoding", action="store_true")
     parser.add_argument("--train", action="store_true")
