@@ -552,7 +552,7 @@ class Slime(gym.Env):
 
 if __name__ == "__main__":
     PARAMS_FILE = "../agents/single-agent-params.json"
-    EPISODES = 5
+    EPISODES = 50
     LOG_EVERY = 1
 
     with open(PARAMS_FILE) as f:
