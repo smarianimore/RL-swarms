@@ -1,0 +1,22 @@
+  {
+  "lr": 3e-4,
+  "step_lr": 0.99992,
+  "batch_size": 128,
+  "memory_capacity": 51200,
+  "update_net_every": 4,
+  "alpha": 0.005,
+  "gamma": 0.8,
+  "epsilon": 0.90,
+  "epsilon_end": 0.00,
+  "epsilon_test": 0.0,
+  "decay": 2e-6,
+  "train_episodes": 100,
+  "TRAIN_LOG_EVERY": 1,
+  "test_episodes": 10,
+  "TEST_LOG_EVERY": 1,
+  "OUTPUT_FILE": "multi-test-01",
+  "actions": ["move-toward-chemical", "random-walk", "drop-chemical"],
+  "fist_saveimages_episode": 1,
+  "middle_saveimages_episode": 50,
+  "last_saveimages_episode": 100
+}
