@@ -4,7 +4,7 @@ import sys
 from typing import Optional
 from itertools import product
 
-import gym
+import gymnasium as gym
 import numpy as np
 import pygame
 from gym import spaces
@@ -288,7 +288,7 @@ class Slime(gym.Env):
 
         cur_reward = self.reward_cluster_and_time_punish_time()
 
-        return self._get_obs(), cur_reward, False, {}  # DOC Gym v26 has additional 'truncated' boolean
+        return self._get_obs(), cur_reward, False, False, {}  # DOC Gym v26 has additional 'truncated' boolean
 
     def lay_pheromone(self, pos, amount: int):
         """
@@ -551,8 +551,9 @@ class Slime(gym.Env):
 
 
 if __name__ == "__main__":
-    PARAMS_FILE = "../agents/single-agent-params.json"
-    EPISODES = 50
+    print(gym.__version__)
+    PARAMS_FILE = "single-agent-env-params.json"
+    EPISODES = 5
     LOG_EVERY = 1
 
     with open(PARAMS_FILE) as f:
