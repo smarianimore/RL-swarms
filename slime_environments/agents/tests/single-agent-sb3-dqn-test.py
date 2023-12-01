@@ -17,9 +17,10 @@ with open(PARAMS_FILE) as f:
 
 env = gym.make("Slime-v0", **params)
 gym_check_env(env.unwrapped)
-
-print("Environment compatible with Stable Baselines3")
+print(f"Environment compatible with Gymnasium {gym.__version__=}")
+sb3_check_env(env.unwrapped)
+print(f"Environment compatible with Stable-baselines3 {sb3.__version__=}")
 
 model = DQN("MlpPolicy", env, verbose=1)
-model.learn(total_timesteps=1000, log_interval=4)
-print("SB3 DQN sample training completed.")
+model.learn(total_timesteps=1000, log_interval=10)
+print("SB3 DQN test completed.")
