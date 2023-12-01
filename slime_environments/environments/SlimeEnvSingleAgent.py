@@ -145,7 +145,8 @@ class Slime(gym.Env):
         # DOC {(x,y): [(x,y), ..., (x,y)]} pre-computed diffusion area for each patch, including itself
         self.diffuse_patches = {}
         if self.diffuse_mode == 'cascade':
-            self._find_neighbours_cascade(self.diffuse_patches, self.diffuse_area)
+            (self.
+             _find_neighbours_cascade(self.diffuse_patches, self.diffuse_area))
         else:
             self._find_neighbours(self.diffuse_patches, self.diffuse_area)
         # DOC {(x,y): [(x,y), ..., (x,y)]} pre-computed cluster-check for each patch, including itself

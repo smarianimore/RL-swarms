@@ -173,8 +173,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("params_path", type=str)
-    parser.add_argument("learning_params_path", type=str)
+    parser.add_argument("params_path", type=str, default="multi-agent-params.json")
+    parser.add_argument("learning_params_path", type=str, default="ma-learning-params.json")
     
     args = parser.parse_args()
     

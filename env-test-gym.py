@@ -16,5 +16,5 @@ check_env(env)
 print("Environment compatible with Stable Baselines3")
 
 model = DQN("MlpPolicy", env, verbose=1)
-model.learn(total_timesteps=1000,log_interval=4)
+model.learn(total_timesteps=1000, log_interval=4)
 print("SB3 DQN sample training completed.")
