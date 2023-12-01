@@ -7,8 +7,8 @@ from itertools import product
 import gymnasium as gym
 import numpy as np
 import pygame
-from gym import spaces
-from gym.spaces import MultiBinary
+from gymnasium import spaces
+from gymnasium.spaces import MultiBinary
 
 BLACK = (0, 0, 0)
 BLUE = (0, 0, 255)
@@ -484,8 +484,8 @@ class Slime(gym.Env):
         self.rewards.append(cur_reward)
         return cur_reward
 
-    def reset(self):
-        # super().reset()
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         # empty stuff
         self.rewards = []
         self.cluster_ticks = 0
@@ -503,7 +503,7 @@ class Slime(gym.Env):
         for p in self.patches:
             self.patches[p]['chemical'] = 0.0
 
-        return self._get_obs()
+        return self._get_obs(), {}
 
     def render(self, mode="human",**kwargs):
         for event in pygame.event.get():
@@ -549,7 +549,6 @@ class Slime(gym.Env):
 
     def _get_obs(self):
         return np.array([self._compute_cluster() >= self.cluster_threshold, self._check_chemical()])
-
 
 if __name__ == "__main__":
     print(gym.__version__)

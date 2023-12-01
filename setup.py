@@ -4,5 +4,5 @@ setup(
     name="slime_environments",
     version="1.0.0",
     packages=find_packages(),
-    install_requires=['gym', 'pygame']
+    install_requires=['gymnasium', 'pygame']
 )
