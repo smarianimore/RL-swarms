@@ -6,7 +6,7 @@
   "epsilon_test": 0.0,
   "decay": 20e-9,
   "train_episodes": 100,
-  "TRAIN_LOG_EVERY": 1,
+  "TRAIN_LOG_EVERY": 10,
   "test_episodes": 10,
   "TEST_LOG_EVERY": 1,
   "OUTPUT_FILE": "multi-test-01",

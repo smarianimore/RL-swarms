@@ -7,8 +7,7 @@ import os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from utils.utils import read_params, save_env_image, state_to_int_map, setup, video_from_images
-
+import slime_environments.agents.utils.utils as utils
 import argparse
 
 import os
@@ -17,13 +16,14 @@ import numpy as np
 import random
 from tqdm import tqdm
 
+
 def create_agent(params:dict, l_params:dict, train_episodes:int):
     n_actions = len(l_params["actions"])
     population = params['population']
     learner_population = params['learner_population']
     
     # Q_table
-    qtable = {i: np.zeros([4, n_actions]) for i in range(population, population + learner_population)}
+    qtable = {str(i): np.zeros([4, n_actions]) for i in range(population, population + learner_population)}
     
     # DOC dict che tiene conto della frequenza di scelta delle action per ogni episodio {episode: {action: _, action: _, ...}}
     actions_dict = {str(ep): {str(ac): 0 for ac in range(n_actions)} for ep in range(1, train_episodes + 1)}  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
@@ -51,6 +51,7 @@ def train(env,
           gamma:float, 
           decay:float,
           epsilon:float,
+          epsilon_end:float,
           output_file:str,
           output_dir:str):
     # TRAINING
@@ -62,8 +63,8 @@ def train(env,
         
         for tick in tqdm(range(1, params['episode_ticks'] + 1)):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                cur_state, reward, _, _ = env.last(agent)
-                cur_s = state_to_int_map(cur_state.observe())
+                cur_state, reward, _, _, _ = env.last(agent)
+                cur_s = utils.state_to_int_map(cur_state)
                 
                 if ep == 1 and tick == 1:
                     action = env.action_space(agent).sample()
@@ -102,16 +103,16 @@ def train(env,
                         os.makedirs(os.path.join(output_dir, "images"))
                 
                 if ep == int(l_params["fist_saveimages_episode"]):
-                    save_env_image(image, tick, output_dir, "first_episode")
+                    utils.save_env_image(image, tick, output_dir, "first_episode")
                 elif ep == int(l_params["middle_saveimages_episode"]):
-                    save_env_image(image, tick, output_dir, "middle_episode")
+                    utils.save_env_image(image, tick, output_dir, "middle_episode")
                 elif ep == int(l_params["last_saveimages_episode"]):
-                    save_env_image(image, tick, output_dir, "last_episode")
+                    utils.save_env_image(image, tick, output_dir, "last_episode")
             
             elif ep == int(l_params["fist_saveimages_episode"]) + 1 and tick == 1:
-                video_from_images(output_dir, "first_episode")
+                utils.video_from_images(output_dir, "first_episode")
             elif ep == int(l_params["middle_saveimages_episode"]) + 1 and tick == 1:
-                video_from_images(output_dir, "middle_episode")
+                utils.video_from_images(output_dir, "middle_episode")
             
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         
@@ -150,7 +151,7 @@ def eval(env,
         for tick in range(1, params['episode_ticks']+1):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 state, _, _, _ = env.last(agent)
-                s = state_to_int_map(state.observe())
+                s = utils.state_to_int_map(state.observe())
 
                 if random.uniform(0, 1) < epsilon:
                     # action = np.random.randint(0, 2)
@@ -180,12 +181,12 @@ def main(args):
     np.random.seed(args.random_seed)
     curdir = os.path.dirname(os.path.abspath(__file__))
     
-    params, l_params = read_params(args.params_path, args.learning_params_path)
+    params, l_params = utils.read_params(args.params_path, args.learning_params_path)
     epsilon_end = l_params["epsilon_end"]
     
     env = Slime(render_mode="human", **params)
     
-    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(True, curdir, params, l_params)
+    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = utils.setup(True, curdir, params, l_params)
     
     qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
     
@@ -196,8 +197,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("params_path", type=str)
-    parser.add_argument("learning_params_path", type=str)
+    parser.add_argument("--params_path", type=str, default="sarsa-env-params.json", required=False)
+    parser.add_argument("--learning_params_path", type=str, default="sarsa-learning-params.json", required=False)
     parser.add_argument("--random-seed", type=int, default=0)
     
     args = parser.parse_args()
