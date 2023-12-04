@@ -1,14 +1,14 @@
 #from environments.SlimeEnvSingleAgent import Slime
 
 import datetime
-import gym
+import gymnasium as gym
 import json
 import numpy as np
 import random
 import slime_environments
 
-PARAMS_FILE = "single-agent-params.json"
-LEARNING_PARAMS_FILE = "sa-learning-params.json"
+PARAMS_FILE = "qLearning-env-params.json"
+LEARNING_PARAMS_FILE = "qLearning-learning-params.json"
 with open(LEARNING_PARAMS_FILE) as f:
     l_params = json.load(f)
 OUTPUT_FILE = f"{l_params['OUTPUT_FILE']}-{datetime.datetime.now()}.csv"
@@ -69,7 +69,7 @@ def observation_to_int_map(obs):
 # TRAINING
 print("Start training...")
 for ep in range(1, TRAIN_EPISODES+1):
-    observation = env.reset()
+    observation, _ = env.reset()
     obs = observation_to_int_map(observation)
     for tick in range(1, params['episode_ticks']+1):
         if random.uniform(0, 1) < epsilon:
@@ -77,7 +77,7 @@ for ep in range(1, TRAIN_EPISODES+1):
         else:
             action = np.argmax(q_table[obs])  # Exploit learned values
 
-        next_observation, reward, _, _ = env.step(action)
+        next_observation, reward, _, _, _ = env.step(action)
         next_obs = observation_to_int_map(next_observation)
 
         old_value = q_table[obs][action]
@@ -115,7 +115,7 @@ for ep in range(1, TEST_EPISODES+1):
     obs = observation_to_int_map(observation)
     for tick in range(params['episode_ticks']):
         action = np.argmax(q_table[obs])
-        observation, reward, _, _, = env.step(action)
+        observation, reward, _, _, _ = env.step(action)
         obs = observation_to_int_map(observation)
         reward_episode += reward
         env.render()

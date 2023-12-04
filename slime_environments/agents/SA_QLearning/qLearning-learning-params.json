@@ -1,8 +1,8 @@
 {
-  "alpha": 0.2,
-  "gamma": 0.8,
+  "alpha": 0.1,
+  "gamma": 0.9,
   "epsilon": 0.9,
-  "decay": 0.9998,
+  "decay": 0.9,
   "train_episodes": 100,
   "TRAIN_LOG_EVERY": 10,
   "test_episodes": 10,
