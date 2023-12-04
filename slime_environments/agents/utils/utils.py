@@ -75,13 +75,13 @@ def setup(is_train:bool, curdir:str, params:dict, l_params:dict):
             # From NetlogoDataAnalysis: Episode, Tick, Avg cluster size X tick, Avg reward X episode, move-toward-chemical, random-walk, drop-chemical, (learner 0)-move-toward-chemical
             f.write(f"Episode, Tick, Avg cluster size X tick, ")
         
-        for a in l_params["actions"]:
-            f.write(f"{a}, ")
-        
-        for l in range(params['population'], params['population'] + params['learner_population']):
             for a in l_params["actions"]:
-                f.write(f"(learner {l})-{a}, ")
-        f.write("Avg reward X episode, loss, learning rate\n")
+                f.write(f"{a}, ")
+
+            for l in range(params['population'], params['population'] + params['learner_population']):
+                for a in l_params["actions"]:
+                    f.write(f"(learner {l})-{a}, ")
+            f.write("Avg reward X episode, loss, learning rate\n")
     
     return output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every
 

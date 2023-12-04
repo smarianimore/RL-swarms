@@ -20,8 +20,8 @@ def create_agent(params:dict, l_params:dict, train_episodes:int):
     learner_population = params['learner_population']
     
     # Q_table
-    qtable = {i: np.zeros([4, n_actions]) for i in range(population, population + learner_population)}
-    
+    qtable = {str(i): np.zeros([4, n_actions]) for i in range(population, population + learner_population)}
+
     # DOC dict che tiene conto della frequenza di scelta delle action per ogni episodio {episode: {action: _, action: _, ...}}
     actions_dict = {str(ep): {str(ac): 0 for ac in range(n_actions)} for ep in range(1, train_episodes + 1)}  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
     # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
@@ -57,8 +57,8 @@ def train(env,
         
         for tick in range(1, params['episode_ticks'] + 1):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                cur_state, reward, _, _ = env.last(agent)
-                cur_s = utils.state_to_int_map(cur_state.observe())
+                cur_state, reward, _, _, _ = env.last(agent)
+                cur_s = utils.state_to_int_map(cur_state)
                 
                 if ep == 1 and tick == 1:
                     action = env.action_space(agent).sample()
@@ -161,8 +161,8 @@ def main(args):
     
     env = Slime(render_mode="human", **params)
     
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = utils.setup(curdir, params, l_params)
-    
+    output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = utils.setup(True, curdir, params, l_params)
+
     qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
     
     env, qtable = train(env, params, qtable, actions_dict, action_dict, reward_dict, cluster_dict, train_episodes, train_log_every, alpha, gamma, decay, epsilon, output_file)
@@ -172,8 +172,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("params_path", type=str, default="multi-agent-env-params.json")
-    parser.add_argument("learning_params_path", type=str, default="qLearning-learning-params.json")
+    parser.add_argument("--params_path", type=str, default="qLearning-env-params.json", required=False)
+    parser.add_argument("--learning_params_path", type=str, default="qLearning-learning-params.json", required=False)
+    parser.add_argument("--random_seed", type=int, default=42, required=False)
     
     args = parser.parse_args()
     

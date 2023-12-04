@@ -115,7 +115,7 @@ class Slime(AECEnv):
                 self.coords.append((x, y))  # "centre" of the patch or turtle (also ID of the patch)
 
         pop_tot = self.population + self.learner_population
-        self.possible_agents = ["agent_"+ str(i) for i in range(self.population, pop_tot)]  # DOC learning agents IDs
+        self.possible_agents = [str(i) for i in range(self.population, pop_tot)]  # DOC learning agents IDs
         self._agent_selector = agent_selector(self.possible_agents)
         self.agent = self._agent_selector.reset()
 
@@ -294,7 +294,7 @@ class Slime(AECEnv):
             
         self.agent_selection = self._agent_selector.next()
         # print(self.agent_selection)
-        self._cumulative_rewards["agent_"+str(agent_in_charge)] = 0
+        self._cumulative_rewards[str(agent_in_charge)] = 0
         # print("---")
         # print(self._cumulative_rewards)
         self._accumulate_rewards()
@@ -321,7 +321,7 @@ class Slime(AECEnv):
         #self._diffuse()
 
         self.agent = current_agent
-        self.observations["agent_"+str(self.agent)] = np.array([self._compute_cluster(self.agent) >= self.cluster_threshold
+        self.observations[str(self.agent)] = np.array([self._compute_cluster(self.agent) >= self.cluster_threshold
                                             ,self._check_chemical(self.agent)])
         self.reward_cluster_and_time_punish_time(self.agent)
 
