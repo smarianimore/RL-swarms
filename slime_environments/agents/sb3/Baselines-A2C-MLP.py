@@ -1,16 +1,14 @@
-from stable_baselines3 import A2C
 import slime_environments
-import gym
+import gymnasium as gym
 import json
+from stable_baselines3 import A2C
 
-#model = A2C('MlpPolicy', 'Slime-v0').learn(100)  # FIXME find way to pass arguments to env
-
-PARAMS_FILE = "single-agent-params.json"
+PARAMS_FILE = "single-agent-a2c-mlp-env-params.json"
 with open(PARAMS_FILE) as f:
     params = json.load(f)
 env = gym.make("Slime-v0", **params)
 
-model = A2C('MlpPolicy', env, verbose=2)  # 2 = debug
+model = A2C('MlpPolicy', env, verbose=2)  # 2=debug
 model.learn(total_timesteps=100*params['episode_ticks'])  # total env steps
 
 obs, _ = env.reset()

@@ -11,7 +11,7 @@ print(f"{gym.__version__=}")
 print(f"{sb3.__version__=}")
 print(f"{os.getcwd()=}")
 
-PARAMS_FILE = "slime_environments/agents/tests/single-agent-sb3-dqn-learning-params.json"
+PARAMS_FILE = "single-agent-sb3-dqn-env-params.json"
 with open(PARAMS_FILE) as f:
     params = json.load(f)
 
