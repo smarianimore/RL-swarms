@@ -10,6 +10,7 @@ import subprocess
 import cv2
 from typing import Optional
 
+
 def read_params(params_path:str, learning_params_path:str):
     params, l_params = dict(), dict()
     try:
@@ -100,7 +101,7 @@ def calculate_epsilon(type:str, episodes:int, ticks:int, learners:int, epsilon: 
                 else:
                     if type.lower() in "normal":
                         epsilon *= decay
-                    elif type.lower() == "esponential":
+                    elif type.lower() == "exponential":
                         epsilon = epsilon_end + (epsilon - epsilon_end) * math.exp(-1. * ep * decay)
                     
                 values.append(epsilon)

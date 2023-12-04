@@ -1,3 +1,6 @@
 gymnasium
 pygame
 stable-baselines3
+pettingzoo
+tdqm
+opencv-python

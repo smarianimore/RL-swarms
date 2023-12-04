@@ -3,12 +3,11 @@ import random
 import sys
 from typing import Optional
 
-import gym
-from gymnasium.spaces import Discrete,MultiBinary
+import gymnasium as gym
+from gymnasium.spaces import Discrete, MultiBinary
 
 import numpy as np
 import pygame
-from gym import spaces
 from pettingzoo import AECEnv
 from pettingzoo.utils import agent_selector
 from pettingzoo.utils.env import ObsType
@@ -21,59 +20,11 @@ RED = (190, 0, 0)
 GREEN = (0, 190, 0)
 
 
-class BooleanSpace(gym.Space):
-    def __init__(self, size=None):
-        """
-        A space of boolean values
-        :param size: how many boolean values the space is made of
-        """
-        assert isinstance(size, int) and size > 0
-        self.size = size
-        self.values = [False for _ in range(self.size)]
-        gym.Space.__init__(self, (), bool)
-
-    def contains(self, x):
-        return x in self.values
-
-    def sample(self):
-        return [random.choice([True, False]) for _ in range(self.size)]
-        # return self.values
-
-    def observe(self):
-        """
-        Get the current observation
-        :return: the current observation
-        """
-        return self.values
-
-    def change(self, p, value):
-        """
-        Set a specific boolean value for the current observation
-        :param p: which boolean values to change (position index)
-        :param value: the boolean value to set
-        :return: None
-        """
-        self.values[p] = value
-
-    def change_all(self, values):
-        """
-        Set all the boolean values for the current observation
-        :param values: the boolean values to set
-        :return: None
-        """
-        self.values = values
-
-
 class Slime(AECEnv):
-    def seed(self, seed: Optional[int] = None) -> None:
-        pass
 
     def observe(self, agent: str) -> ObsType:
         return np.array(self.observations[agent])
 
-    def state(self) -> np.ndarray:
-        pass
-    
     def observation_space(self, agent):
         return self._observation_spaces[agent]
     
@@ -81,6 +32,7 @@ class Slime(AECEnv):
         return self._action_spaces[agent]
     
     metadata = {"render_modes": ["human", "server"]}
+
 
     def __init__(self,
                  render_mode: Optional[str] = None,
@@ -712,7 +664,7 @@ class Slime(AECEnv):
 
 
 if __name__ == "__main__":
-    PARAMS_FILE = "../agents/Sarsa/multi-agent-params.json"
+    PARAMS_FILE = "multi-agent-env-params.json"
     EPISODES = 5
     LOG_EVERY = 1
 
@@ -724,20 +676,18 @@ if __name__ == "__main__":
         render = "server"
     env = Slime(render_mode=render, **params)
 
-    # for ep in range(1, EPISODES + 1):
-    #     env.reset()
-    #     print(
-    #         f"-------------------------------------------\nEPISODE: {ep}\n-------------------------------------------")
-    #     for tick in range(params['episode_ticks']):
-    #         for agent in env.agent_iter(max_iter=params["learner_population"]):
-    #             observation, reward, _ , _, info = env.last(agent)
-    #             env.step(env.action_space(agent).sample())
-    #         # env.evaporate_chemical()
-    #         # env.move()
-    #         # env._evaporate()
-    #         # env._diffuse()
-    #         # env.render()
-    # env.close()
+    for ep in range(1, EPISODES + 1):
+        env.reset()
+        print(
+            f"-------------------------------------------\nEPISODE: {ep}\n-------------------------------------------")
+        for tick in range(params['episode_ticks']):
+            for agent in env.agent_iter(max_iter=params["learner_population"]):
+                observation, reward, _ , _, info = env.last(agent)
+                env.step(env.action_space(agent).sample())
+            # env.evaporate_chemical()
+            # env.move()
+            # env._evaporate()
+            # env._diffuse()
+            # env.render()
+    env.close()
     
-    #PettingZoo Environment validation check
-    api_test(env, num_cycles=1000, verbose_progress=True)

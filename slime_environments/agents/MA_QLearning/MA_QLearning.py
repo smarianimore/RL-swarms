@@ -1,3 +1,4 @@
+import slime_environments.agents.utils.utils as utils
 from slime_environments.environments.SlimeEnvMultiAgent import Slime
 
 import sys
@@ -5,8 +6,6 @@ import os
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
-
-from utils.utils import read_params, state_to_int_map, setup
 
 import argparse
 
@@ -59,7 +58,7 @@ def train(env,
         for tick in range(1, params['episode_ticks'] + 1):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 cur_state, reward, _, _ = env.last(agent)
-                cur_s = state_to_int_map(cur_state.observe())
+                cur_s = utils.state_to_int_map(cur_state.observe())
                 
                 if ep == 1 and tick == 1:
                     action = env.action_space(agent).sample()
@@ -128,7 +127,7 @@ def eval(env,
         for tick in range(1, params['episode_ticks']+1):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 state, _, _, _ = env.last(agent)
-                s = state_to_int_map(state.observe())
+                s = utils.state_to_int_map(state.observe())
 
                 if random.uniform(0, 1) < epsilon:
                     # action = np.random.randint(0, 2)
@@ -158,11 +157,11 @@ def main(args):
     np.random.seed(args.random_seed)
     curdir = os.path.dirname(os.path.abspath(__file__))
     
-    params, l_params = read_params(args.params_path, args.learning_params_path)
+    params, l_params = utils.read_params(args.params_path, args.learning_params_path)
     
     env = Slime(render_mode="human", **params)
     
-    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = setup(curdir, params, l_params)
+    output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = utils.setup(curdir, params, l_params)
     
     qtable, actions_dict, action_dict, reward_dict, cluster_dict = create_agent(params, l_params,train_episodes)
     
@@ -173,8 +172,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("params_path", type=str, default="multi-agent-params.json")
-    parser.add_argument("learning_params_path", type=str, default="ma-learning-params.json")
+    parser.add_argument("params_path", type=str, default="multi-agent-env-params.json")
+    parser.add_argument("learning_params_path", type=str, default="qLearning-learning-params.json")
     
     args = parser.parse_args()
     
