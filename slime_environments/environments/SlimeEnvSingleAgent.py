@@ -2,7 +2,6 @@ import json
 import random
 import sys
 from typing import Optional
-from itertools import product
 
 import gymnasium as gym
 import numpy as np
@@ -15,29 +14,6 @@ BLUE = (0, 0, 255)
 WHITE = (255, 255, 255)
 RED = (190, 0, 0)
 GREEN = (0, 190, 0)
-
-
-class BooleanSpace(gym.Space):
-    @property
-    def is_np_flattenable(self):
-        return True
-
-    def __init__(self, size=None):
-        """
-        A space of boolean values
-        :param size: how many boolean values the space is made of
-        """
-        assert isinstance(size, int) and size > 0
-        self.size = size
-        self._values = list(product([True, False], repeat=self.size))
-        gym.Space.__init__(self, (2,), bool)
-
-    def contains(self, x):
-        return x in self._values
-
-    def sample(self):
-        return random.choice(self._values)
-        # return self.values
 
 
 class Slime(gym.Env):
@@ -154,7 +130,8 @@ class Slime(gym.Env):
         self._find_neighbours(self.cluster_patches, self.cluster_radius)
 
         self.action_space = spaces.Discrete(3)  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone TODO as dict
-        self.observation_space = MultiBinary(2)  # DOC [0] = whether the turtle is in a cluster [1] = whether there is chemical in turtle patch
+        self.observation_space = MultiBinary(
+            2)  # DOC [0] = whether the turtle is in a cluster [1] = whether there is chemical in turtle patch
         self._action_to_name = {0: "random-walk", 1: "drop-chemical", 2: "move-toward-chemical"}
 
         self.screen = pygame.display.set_mode((self.W_pixels, self.H_pixels))
@@ -181,28 +158,36 @@ class Slime(gym.Env):
         for p in self.patches:
             neighbours[p] = []
             for ring in range(area):
-                for x in range(p[0] + (ring * self.patch_size), p[0] + ((ring + 1) * self.patch_size) + 1, self.patch_size):
-                    for y in range(p[1] + (ring * self.patch_size), p[1] + ((ring + 1) * self.patch_size) + 1, self.patch_size):
-                        #x, y = self._wrap(x, y)
+                for x in range(p[0] + (ring * self.patch_size), p[0] + ((ring + 1) * self.patch_size) + 1,
+                               self.patch_size):
+                    for y in range(p[1] + (ring * self.patch_size), p[1] + ((ring + 1) * self.patch_size) + 1,
+                                   self.patch_size):
+                        # x, y = self._wrap(x, y)
                         if (x, y) not in neighbours[p]:
                             neighbours[p].append((x, y))
-                for x in range(p[0] + (ring * self.patch_size), p[0] - ((ring + 1) * self.patch_size) - 1, -self.patch_size):
-                    for y in range(p[1] + (ring * self.patch_size), p[1] - ((ring + 1) * self.patch_size) - 1, -self.patch_size):
-                        #x, y = self._wrap(x, y)
+                for x in range(p[0] + (ring * self.patch_size), p[0] - ((ring + 1) * self.patch_size) - 1,
+                               -self.patch_size):
+                    for y in range(p[1] + (ring * self.patch_size), p[1] - ((ring + 1) * self.patch_size) - 1,
+                                   -self.patch_size):
+                        # x, y = self._wrap(x, y)
                         if (x, y) not in neighbours[p]:
                             neighbours[p].append((x, y))
-                for x in range(p[0] + (ring * self.patch_size), p[0] + ((ring + 1) * self.patch_size) + 1, self.patch_size):
-                    for y in range(p[1] + (ring * self.patch_size), p[1] - ((ring + 1) * self.patch_size) - 1, -self.patch_size):
-                        #x, y = self._wrap(x, y)
+                for x in range(p[0] + (ring * self.patch_size), p[0] + ((ring + 1) * self.patch_size) + 1,
+                               self.patch_size):
+                    for y in range(p[1] + (ring * self.patch_size), p[1] - ((ring + 1) * self.patch_size) - 1,
+                                   -self.patch_size):
+                        # x, y = self._wrap(x, y)
                         if (x, y) not in neighbours[p]:
                             neighbours[p].append((x, y))
-                for x in range(p[0] + (ring * self.patch_size), p[0] - ((ring + 1) * self.patch_size) - 1, -self.patch_size):
-                    for y in range(p[1] + (ring * self.patch_size), p[1] + ((ring + 1) * self.patch_size) + 1, self.patch_size):
-                        #x, y = self._wrap(x, y)
+                for x in range(p[0] + (ring * self.patch_size), p[0] - ((ring + 1) * self.patch_size) - 1,
+                               -self.patch_size):
+                    for y in range(p[1] + (ring * self.patch_size), p[1] + ((ring + 1) * self.patch_size) + 1,
+                                   self.patch_size):
+                        # x, y = self._wrap(x, y)
                         if (x, y) not in neighbours[p]:
                             neighbours[p].append((x, y))
             neighbours[p] = [self._wrap(x, y) for (x, y) in neighbours[p]]
-            #neighbours[p] = list(set(neighbours[p]))
+            # neighbours[p] = list(set(neighbours[p]))
 
     def _find_neighbours(self, neighbours: dict, area: int):
         """
@@ -449,7 +434,7 @@ class Slime(gym.Env):
         :return: a boolean
         """
         return self.patches[self.learner['pos']][
-                   'chemical'] >= self.sniff_threshold
+            'chemical'] >= self.sniff_threshold
 
     def reward_cluster_punish_time(self):
         """
@@ -505,7 +490,7 @@ class Slime(gym.Env):
 
         return self._get_obs(), {}
 
-    def render(self, mode="human",**kwargs):
+    def render(self, mode="human", **kwargs):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:  # window closed -> program quits
                 pygame.quit()
@@ -522,7 +507,8 @@ class Slime(gym.Env):
             pygame.draw.rect(self.screen, (0, chem if chem <= 255 else 255, 0),
                              pygame.Rect(p[0] - self.offset, p[1] - self.offset, self.patch_size, self.patch_size))
             if self.show_chem_text and (not sys.gettrace() is None or
-                                        self.patches[p]['chemical'] >= self.sniff_threshold):  # if debugging show text everywhere, even 0
+                                        self.patches[p][
+                                            'chemical'] >= self.sniff_threshold):  # if debugging show text everywhere, even 0
                 text = self.chemical_font.render(str(round(self.patches[p]['chemical'], 1)), True, GREEN)
                 self.screen.blit(text, text.get_rect(center=p))
 
@@ -549,6 +535,7 @@ class Slime(gym.Env):
 
     def _get_obs(self):
         return np.array([self._compute_cluster() >= self.cluster_threshold, self._check_chemical()])
+
 
 if __name__ == "__main__":
     print(gym.__version__)
