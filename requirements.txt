@@ -4,3 +4,5 @@ stable-baselines3
 pettingzoo
 tdqm
 opencv-python
+neat-python
+numpy
