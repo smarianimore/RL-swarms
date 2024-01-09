@@ -64,7 +64,7 @@ def init_neat():
 
     checkpoint_files = os.listdir('neat_checkpoints') if os.path.isdir('neat_checkpoints') else []
     if len(checkpoint_files) > 0:
-        checkpoint_files.sort(reverse=True)
+        checkpoint_files.sort(reverse=True, key=lambda x: int(x.split('_')[1]))
         latest_checkpoint = os.path.join('neat_checkpoints', checkpoint_files[0])
 
         print(f"Restoring latest checkpoint: {latest_checkpoint}")
