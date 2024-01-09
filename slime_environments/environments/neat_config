@@ -2,7 +2,8 @@
 
 [NEAT]
 fitness_criterion     = max
-fitness_threshold     = 3.9
+# Never ending: keep improving undefinitely!
+fitness_threshold     = inf
 pop_size              = 150
 reset_on_extinction   = False
 
