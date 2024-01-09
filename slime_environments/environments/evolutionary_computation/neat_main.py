@@ -403,6 +403,8 @@ def update_agents(genomes, config):
     # Observe the agents' behavior for some time
     prof = Profiler()
 
+    action_histogram = np.array([0, 0, 0])
+
     for tick in range(0, EVAL_FITNESS_TICKS):
         prof.begin('tick')
 
@@ -420,6 +422,8 @@ def update_agents(genomes, config):
             action_prob_distr = nn[agent_id].activate(agent_state)
             agent_action = np.argmax(action_prob_distr)
             prof.end('inference')
+
+            action_histogram[agent_action] += 1
 
             perform_action(agent_id, agent_action)
 
@@ -450,6 +454,9 @@ def update_agents(genomes, config):
         if tick % 100 == 0:
             print(f"Tick {tick:04d}; {prof}")
             prof.reset()
+
+    action_histogram = action_histogram / np.sum(action_histogram)
+    print(f"Action histogram; random_walk: {action_histogram[0]:.3f}, lay_pheromone: {action_histogram[1]:.3f}, follow_pheromone: {action_histogram[2]:.3f}")
 
     # Update the genome fitness
     for agent_id, genome in genomes:
