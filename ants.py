@@ -593,42 +593,6 @@ class Ants(AECEnv):
 
         return cluster
 
-    # not a real reward function
-    def test_reward(self, current_agent):  # trying to invert rewards process, GOAL: check any strange behaviour
-        """
-        :return: the reward
-        """
-        self.agent = current_agent
-        chem = 0
-        for p in self.patches.values():
-            if self.agent in p['turtles']:
-                chem = p['chemical']
-        if chem >= 5:
-            cur_reward = -1000
-        else:
-            cur_reward = 100
-
-        self.rewards_cust[self.agent].append(cur_reward)
-        return cur_reward
-
-    def reward_cluster_punish_time(self, current_agent):  # DOC NetLogo rewardFunc7
-        """
-        Reward is (positve) proportional to cluster size (quadratic) and (negative) proportional to time spent outside
-        clusters
-
-        :return: the reward
-        """
-        self.agent = current_agent
-        cluster = self._compute_cluster(self.agent)
-        if cluster >= self.cluster_threshold:
-            self.cluster_ticks[self.agent] += 1
-
-        cur_reward = ((cluster ^ 2) / self.cluster_threshold) * self.reward + (
-                ((self.episode_ticks - self.cluster_ticks[self.agent]) / self.episode_ticks) * self.penalty)
-
-        self.rewards_cust[self.agent].append(cur_reward)
-        return cur_reward
-
     def reset(self, seed=None, return_info=True, options=None):
         # empty stuff
         pop_tot = self.population + self.learner_population
@@ -840,7 +804,6 @@ class Ants(AECEnv):
         """
         self.agent = current_agent
         if self.patches[current_agent['pos']]['food'] > 1:
-            print('Got a reward!')
             cur_reward = self.reward
         else:
             cur_reward = 0
@@ -855,6 +818,7 @@ class Ants(AECEnv):
         """
         self.agent = current_agent
         if self.patches[self.learners[current_agent]['pos']]['food'] > 1:
+            print('Got a reward!')
             cur_reward = self.reward
         else:
             cur_reward = 0
