@@ -1,5 +1,5 @@
 import slime_environments.agents.utils.utils as utils
-from ants import Ants
+from slime_environments.environments.SlimeEnvMultiAgent import Slime
 
 import sys
 import os
@@ -159,7 +159,7 @@ def main(args):
     
     params, l_params = utils.read_params(args.params_path, args.learning_params_path)
     
-    env = Ants(render_mode="human", **params)
+    env = Slime(render_mode="human", **params)
     
     output_dir, output_file, alpha, gamma, epsilon, decay, train_episodes, train_log_every, test_episodes, test_log_every = utils.setup(True, curdir, params, l_params)
 

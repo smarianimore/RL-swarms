@@ -1,9 +1,9 @@
-from SlimeEnvMultiAgent import Slime
+from slime_environments.environments.SlimeEnvMultiAgent import Slime
 import pettingzoo
 from pettingzoo.test import api_test
 import json
 
-PARAMS_FILE = r"slime_environments\environments\multi-agent-env-params.json"
+PARAMS_FILE = "multi-agent-env-params.json"
 
 with open(PARAMS_FILE) as f:
     params = json.load(f)

@@ -1,4 +1,4 @@
-#import slime_environments
+import slime_environments
 import gymnasium as gym
 from gymnasium.utils.env_checker import check_env as gym_check_env
 import stable_baselines3 as sb3

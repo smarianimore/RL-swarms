@@ -1,6 +1,5 @@
 """
 Reproduction of NetLogo Ants Model.
-Author: Francesca Palazzo
 Date: 27/12/2023
 WHAT IS IT?
 a colony of ants forages for food. Though each ant follows a set of simple rules, the colony as a whole acts in a sophisticated way.
@@ -191,9 +190,10 @@ class Ants(AECEnv):
         self.cluster_patches = {}
         self._find_neighbours(self.cluster_patches, self.cluster_radius)
 
-        self._action_spaces = {a: Discrete(3) for a in
-                              self.possible_agents}  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
-        self._observation_spaces = {a: MultiBinary(2) for a in
+        self._action_spaces = {a: Discrete(4) for a in
+                              self.possible_agents} # DOC 0 = walk, 1 = follow_pheromone --> only red ants (without food)
+                                                    # DOC 2 = go to the nest, 3 = go to the nest + lay_pheromone --> only orange ants (with food)
+        self.observations = {a: MultiBinary(2) for a in
                               self.possible_agents}  # DOC [0] = whether the turtle is in a cluster [1] = whether there is chemical in turtle patch
 
         if self.gui:
@@ -313,17 +313,34 @@ class Ants(AECEnv):
         self.process_agent(agent_in_charge) #
         self.state[agent_in_charge] = action #can ignore this
         
-        
-        if action == 0:  # DOC walk
-            self.walk(self.learners[agent_in_charge], agent_in_charge)
-        elif action == 1:  # DOC lay_pheromone
-            self.lay_pheromone(self.learners[agent_in_charge]['pos'], self.lay_amount)
-        elif action == 2:  # DOC follow_pheromone
-            max_pheromone, max_coords = self._find_max_pheromone(self.learners[agent_in_charge]['pos'])
-            if max_pheromone >= self.sniff_threshold:
-                self.follow_pheromone(max_coords, self.learners[agent_in_charge], agent_in_charge)
-            else:
+        if self.learners[agent_in_charge]['color'] == RED:
+            if action == 0:  # DOC walk
                 self.walk(self.learners[agent_in_charge], agent_in_charge)
+            elif action == 1:  # DOC follow_pheromone
+                max_pheromone, max_coords = self._find_max_pheromone(self.learners[agent_in_charge]['pos'])
+                if max_pheromone >= self.sniff_threshold:
+                    self.follow_pheromone(max_coords, self.learners[agent_in_charge], agent_in_charge)
+                else:
+                    self.walk(self.learners[agent_in_charge], agent_in_charge)
+
+            pos = self.learners[agent_in_charge]['pos']
+            if self.patches[pos]['food'] > 0:
+                self.learners[agent_in_charge]['color'] = ORANGE
+                self.patches[pos]['food'] -= 1
+
+        elif self.learners[agent_in_charge]['color'] == ORANGE:
+            if action == 2:  # DOC go to the nest
+                max_pheromone, max_coords = self.uphill_nest_scent(self.learners[agent_in_charge]['pos'])
+                self.follow_pheromone(max_coords, self.learners[agent_in_charge], agent_in_charge)
+            elif action == 3:  # DOC go to the nest + lay_pheromone
+                max_pheromone, max_coords = self.uphill_nest_scent(self.learners[agent_in_charge]['pos'])
+                self.follow_pheromone(max_coords, self.learners[agent_in_charge], agent_in_charge)
+                self.lay_pheromone(self.learners[agent_in_charge]['pos'], self.lay_amount)
+
+            #se siamo arrivati al nido 
+            if self.patches[self.learners[agent_in_charge]['pos']]['nest'] == 1:
+                self.learners[agent_in_charge]['color'] = RED
+            
 
         if self._agent_selector.is_last():
             for ag in self.agents:
@@ -387,15 +404,43 @@ class Ants(AECEnv):
 
         return max_ph, winner
 
+    def _is_carrying_food(self, current_agent):
+        """
+        Checks if an agent is carrying food (in other word, its color is orange)
 
+        :return a boolean
+        """
+        if self.learners[current_agent]['color'] == ORANGE:
+            food = True 
+        else:
+            food = False
+
+        return food 
+
+    def _check_chemical_around(self, current_agent):
+        """
+        Checks if in the sorrounding patches there is pheromone.
+
+        :return a boolean
+        """
+        found = False
+        
+        for p in self.smell_patches[self.learners[current_agent]['pos']]:
+            chem = self.patches[p]['chemical']
+            if chem > self.sniff_threshold:
+                found = True    
+        
+        return found
+            
     # not using ".change_all" method form BooleanSpace
     def process_agent(self, current_agent):
         #self._evaporate()
         #self._diffuse()
 
         self.agent = current_agent
-        self.observations[str(self.agent)] = np.array([self._compute_cluster(self.agent) >= self.cluster_threshold
-                                            ,self._check_chemical(self.agent)])
+        food = self._is_carrying_food(current_agent)
+        phero = self._check_chemical_around(current_agent)
+        self.observations[str(self.agent)] = np.array([food , phero])
         self.reward_cluster_and_time_punish_time(self.agent)
 
     def lay_pheromone(self, pos, amount: int):
@@ -548,47 +593,6 @@ class Ants(AECEnv):
 
         return cluster
 
-    def avg_cluster(self):
-        """
-        Record the cluster size
-        :return: avg cluster size
-        """
-        cluster_sizes = []  # registra la dim. dei cluster
-        for l in self.learners:
-            cluster = []  # tiene conto di quali turtle sono in quel cluster
-            for p in self.cluster_patches[self.learners[l]['pos']]:
-                for t in self.patches[p]['turtles']:
-                    cluster.append(t)
-            cluster.sort()
-            if cluster not in cluster_sizes:
-                cluster_sizes.append(cluster)
-
-        # cleaning process: confornta i cluster (nello stesso episodio) e se ne trova 2 con più del 90% di turtle uguali ne elimina 1
-        for cluster in cluster_sizes:
-            for cl in cluster_sizes:
-                if cl != cluster:
-                    intersection = list(set(cluster) & set(cl))
-                    if len(intersection) > len(cluster) * 0.90:
-                        cluster_sizes.remove(cl)
-
-        # calcolo avg_cluster_size
-        somma = 0
-        for cluster in cluster_sizes:
-            somma += len(cluster)
-        avg_cluster_size = somma / len(cluster_sizes)
-
-        return avg_cluster_size
-
-    def _check_chemical(self, current_agent):
-        """
-        Checks whether there is pheromone on the patch where the learner turtle is
-
-        :return: a boolean
-        """
-        self.agent = current_agent
-        return self.patches[self.learners[self.agent]['pos']][
-                   'chemical'] > self.sniff_threshold
-
     # not a real reward function
     def test_reward(self, current_agent):  # trying to invert rewards process, GOAL: check any strange behaviour
         """
@@ -625,23 +629,6 @@ class Ants(AECEnv):
         self.rewards_cust[self.agent].append(cur_reward)
         return cur_reward
 
-    def reward_cluster_and_time_punish_time(self, current_agent):  # DOC NetLogo rewardFunc8
-        """
-
-        :return:
-        """
-        self.agent = current_agent
-        cluster = self._compute_cluster(self.agent)
-        if cluster >= self.cluster_threshold:
-            self.cluster_ticks[self.agent] += 1
-
-        cur_reward = (self.cluster_ticks[self.agent] / self.episode_ticks) * self.reward + \
-                     (cluster / self.cluster_threshold) * (self.reward ** 2) + \
-                     (((self.episode_ticks - self.cluster_ticks[self.agent]) / self.episode_ticks) * self.penalty)
-
-        self.rewards_cust[self.agent].append(cur_reward)
-        return cur_reward
-
     def reset(self, seed=None, return_info=True, options=None):
         # empty stuff
         pop_tot = self.population + self.learner_population
@@ -660,7 +647,6 @@ class Ants(AECEnv):
         self.infos = {agent: {} for agent in self.agents}
         self.state = {agent: None for agent in self.agents}
         self.observations = {a: np.full((2, ), False) for a in self.agents}
-        
         
         # re-position learner turtle
         for l in self.learners:
@@ -765,35 +751,6 @@ class Ants(AECEnv):
             pygame.display.flip()
             return pygame.surfarray.array3d(self.screen)
         
-
-    def _find_neighbours(self, neighbours: dict, area: int):
-        """
-        For each patch, find neighbouring patches within square radius 'area'
-
-        :param neighbours: empty dictionary to fill
-            (will be dict mapping each patch to list of neighouring patches {(x, y): [(nx, ny), ...], ...})
-        :param area: integer representing the number of patches to consider in the 8 directions around each patch
-        :return: None (1st argument modified as side effect)
-        """
-        for p in self.patches:
-            neighbours[p] = []
-            for x in range(p[0], p[0] + (area * self.patch_size) + 1, self.patch_size):
-                for y in range(p[1], p[1] + (area * self.patch_size) + 1, self.patch_size):
-                    x, y = self._wrap(x, y)
-                    neighbours[p].append((x, y))
-            for x in range(p[0], p[0] - (area * self.patch_size) - 1, -self.patch_size):
-                for y in range(p[1], p[1] - (area * self.patch_size) - 1, -self.patch_size):
-                    x, y = self._wrap(x, y)
-                    neighbours[p].append((x, y))
-            for x in range(p[0], p[0] + (area * self.patch_size) + 1, self.patch_size):
-                for y in range(p[1], p[1] - (area * self.patch_size) - 1, -self.patch_size):
-                    x, y = self._wrap(x, y)
-                    neighbours[p].append((x, y))
-            for x in range(p[0], p[0] - (area * self.patch_size) - 1, -self.patch_size):
-                for y in range(p[1], p[1] + (area * self.patch_size) + 1, self.patch_size):
-                    x, y = self._wrap(x, y)
-                    neighbours[p].append((x, y))
-            neighbours[p] = list(set(neighbours[p]))
     def _find_neighbours_cascade(self, neighbours: dict, area: int):
         """
         For each patch, find neighbouring patches within square radius 'area', 1 step at a time
@@ -852,59 +809,6 @@ class Ants(AECEnv):
             y = y - self.H_pixels
         return x, y
     
-    # learners act
-    def step(self, action: int):
-        if(self.terminations[self.agent_selection] or self.truncations[self.agent_selection]):
-            self._was_dead_step(action)
-            return
-        
-        agent_in_charge = self.agent_name_mapping[self.agent_selection]  # ID of agent
-        
-        self.process_agent(agent_in_charge) #
-        self.state[agent_in_charge] = action #can ignore this
-        
-
-        if action == 0:  # DOC walk
-            self.walk(self.learners[agent_in_charge], agent_in_charge)
-        elif action == 1:  # DOC lay_pheromone
-            self.lay_pheromone(self.learners[agent_in_charge]['pos'], self.lay_amount)
-        elif action == 2:  # DOC follow_pheromone
-            max_pheromone, max_coords = self._find_max_pheromone(self.learners[agent_in_charge]['pos'])
-            if max_pheromone >= self.sniff_threshold:
-                self.follow_pheromone(max_coords, self.learners[agent_in_charge], agent_in_charge)
-            else:
-                self.walk(self.learners[agent_in_charge], agent_in_charge)
-
-       
-        if self._agent_selector.is_last():
-            for ag in self.agents:
-                self.rewards[ag] = self.rewards_cust[self.agent_name_mapping[ag]][-1]
-            # print("REW:",self.rewards)
-            self.move()
-            self._evaporate()
-            self._diffuse()
-            self.render()
-        else:
-            self._clear_rewards()
-            
-        self.agent_selection = self._agent_selector.next()
-        # print(self.agent_selection)
-        self._cumulative_rewards[str(agent_in_charge)] = 0
-        # print("---")
-        # print(self._cumulative_rewards)
-        self._accumulate_rewards()
-        # print(self._cumulative_rewards)
-        # print("---")
-
-    def process_agent(self, current_agent):
-        #self._evaporate()
-        #self._diffuse()
-
-        self.agent = current_agent
-        self.observations[str(self.agent)] = np.array([self._compute_cluster(self.agent) >= self.cluster_threshold
-                                            ,self._check_chemical(self.agent)])
-        self.reward_cluster_and_time_punish_time(self.agent)
-
     def _compute_cluster(self, current_agent):
         """
         Checks whether the learner turtle is within a cluster, given 'cluster_radius' and 'cluster_threshold'
@@ -930,18 +834,16 @@ class Ants(AECEnv):
     
     def reward_cluster_punish_time(self, current_agent):  # DOC NetLogo rewardFunc7
         """
-        Reward is (positve) proportional to cluster size (quadratic) and (negative) proportional to time spent outside
-        clusters
+        Reward is (positve) if the agent finds food or return to the nest.
 
         :return: the reward
         """
         self.agent = current_agent
-        cluster = self._compute_cluster(self.agent)
-        if cluster >= self.cluster_threshold:
-            self.cluster_ticks[self.agent] += 1
-
-        cur_reward = ((cluster ^ 2) / self.cluster_threshold) * self.reward + (
-                ((self.episode_ticks - self.cluster_ticks[self.agent]) / self.episode_ticks) * self.penalty)
+        if self.patches[current_agent['pos']]['food'] > 1:
+            print('Got a reward!')
+            cur_reward = self.reward
+        else:
+            cur_reward = 0
 
         self.rewards_cust[self.agent].append(cur_reward)
         return cur_reward
@@ -952,13 +854,10 @@ class Ants(AECEnv):
         :return:
         """
         self.agent = current_agent
-        cluster = self._compute_cluster(self.agent)
-        if cluster >= self.cluster_threshold:
-            self.cluster_ticks[self.agent] += 1
-
-        cur_reward = (self.cluster_ticks[self.agent] / self.episode_ticks) * self.reward + \
-                     (cluster / self.cluster_threshold) * (self.reward ** 2) + \
-                     (((self.episode_ticks - self.cluster_ticks[self.agent]) / self.episode_ticks) * self.penalty)
+        if self.patches[self.learners[current_agent]['pos']]['food'] > 1:
+            cur_reward = self.reward
+        else:
+            cur_reward = 0
 
         self.rewards_cust[self.agent].append(cur_reward)
         return cur_reward
@@ -1002,6 +901,19 @@ class Ants(AECEnv):
             somma += len(cluster)
         avg_cluster_size = somma / len(cluster_sizes)
 
+    def _check_food(self):
+        """
+        Check if there is still food
+
+        :return: boolean
+        """
+
+        for p in self.patches:      
+            if self.patches[p]['food'] > 0:
+                if (self.patches[p]['food_source_number'] == 1 or self.patches[p]['food_source_number'] == 2 or self.patches[p]['food_source_number'] == 3) and self.patches[p]['food'] > 0 :
+                    return True #almeno un patch ha ancora il cibo
+
+
 
 if __name__ == '__main__':
     PARAMS_FILE = "env-ants-params.json"
@@ -1021,18 +933,20 @@ if __name__ == '__main__':
     # Reset the environment to start the simulation
     env.reset()
 
-    #for ep in range(1, EPISODES + 1):
-        #env.reset()
-    #print(f"-------------------------------------------\nEPISODE: {ep}\n-------------------------------------------")
-    for tick in range(params['episode_ticks']):
-        env.move()
-        env._evaporate()
-        env._diffuse()
-        env.render()
-        
+    for ep in range(1, EPISODES + 1):
+        env.reset()
+        print(f"-------------------------------------------\nEPISODE: {ep}\n-------------------------------------------")
+        for tick in range(params['episode_ticks']):
+            for agent in env.agent_iter(max_iter=params["learner_population"]):
+                observation, reward, _ , _, info = env.last(agent)
+                env.step(env.action_space(agent).sample())
             
-        # Optional: Add visualization or logging here
-
+            #env.evaporate_chemical()
+            #env.move()
+            #env._evaporate()
+            #env._diffuse()
+            #env.render()
+            
     # End of simulation
     print("Simulation completed.")
 
