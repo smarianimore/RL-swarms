@@ -151,6 +151,7 @@ class Ants(AECEnv):
         #setup nest and food sources
         center_x = self.coords[int((int(self.W/2)+1/2)*self.H)][0]
         center_y = self.coords[int((int(self.W/2)+1/2)*self.H)][1]
+
         for c in self.coords:
             x = c[0]
             y = c[1]
@@ -212,9 +213,25 @@ class Ants(AECEnv):
             zip(self.possible_agents, list(range(self.population, pop_tot)))
         )
 
+        #distance from food of the past tick{ id_agent: [distanza_dal_cumulo_1,distanza_dal_cumulo_2, distanza_dal_cumulo_3]}
+        self.food_distances = {a: self.get_food_distances(a) for a in self.learners}
+
     def distance(self, x1, y1, x2, y2):
         return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-       
+    
+    def get_food_distances(self, agent):
+        agent_pos = self.learners[agent]["pos"]
+        distances = [np.inf, np.inf, np.inf]  # Inizializza le distanze con infinito
+
+        for p in self.patches:
+            if self.patches[p]['food_source_number'] > 0:
+                food_source_number = self.patches[p]['food_source_number']
+                distance = self.distance(agent_pos[0], agent_pos[1], p[0], p[1])
+                if distance < distances[food_source_number - 1]:
+                    distances[food_source_number - 1] = distance
+
+        return distances
+
     def _find_neighbours_cascade(self, neighbours: dict, area: int):
         """
         For each patch, find neighbouring patches within square radius 'area', 1 step at a time
@@ -309,10 +326,20 @@ class Ants(AECEnv):
             return
         
         agent_in_charge = self.agent_name_mapping[self.agent_selection]  # ID of agent
+
+        """print(f"\nMy name is {agent_in_charge}")
         
-        self.process_agent(agent_in_charge) #
+        if self.learners[agent_in_charge]['color'] == RED:
+            print("I'm a red ant")
+        elif self.learners[agent_in_charge]['color'] == ORANGE:
+            print("I'm an orange ant")
+        else:
+            print("ERROR: I'm an ant, but I am neither red nor orange")
+
         self.state[agent_in_charge] = action #can ignore this
-        
+
+        print(f"I was told to execute action {action}")"""
+
         if self.learners[agent_in_charge]['color'] == RED:
             if action == 0:  # DOC walk
                 self.walk(self.learners[agent_in_charge], agent_in_charge)
@@ -340,7 +367,11 @@ class Ants(AECEnv):
             #se siamo arrivati al nido 
             if self.patches[self.learners[agent_in_charge]['pos']]['nest'] == 1:
                 self.learners[agent_in_charge]['color'] = RED
-            
+        
+        # compute rewards
+        self.process_agent(agent_in_charge) #
+        self.food_distances[agent_in_charge] = self.get_food_distances(agent_in_charge) 
+
 
         if self._agent_selector.is_last():
             for ag in self.agents:
@@ -352,7 +383,7 @@ class Ants(AECEnv):
             self.render()
         else:
             self._clear_rewards()
-            
+
         self.agent_selection = self._agent_selector.next()
         # print(self.agent_selection)
         self._cumulative_rewards[str(agent_in_charge)] = 0
@@ -431,7 +462,7 @@ class Ants(AECEnv):
                 found = True    
         
         return found
-            
+
     # not using ".change_all" method form BooleanSpace
     def process_agent(self, current_agent):
         #self._evaporate()
@@ -441,7 +472,20 @@ class Ants(AECEnv):
         food = self._is_carrying_food(current_agent)
         phero = self._check_chemical_around(current_agent)
         self.observations[str(self.agent)] = np.array([food , phero])
-        self.reward_cluster_and_time_punish_time(self.agent)
+
+        #print(f"observations: food:{food}, phero: {phero}")
+
+        intermediate_reward = 0
+        if self.learners[current_agent]['color'] == RED:
+            intermediate_reward = self.calculate_intermediate_reward(current_agent)
+
+        total_reward = intermediate_reward + self.reward_cluster_punish_time(self.agent)
+            
+        #print(f"Total reward of {total_reward}")
+
+        self.rewards_cust[self.agent].append(total_reward)
+        return total_reward
+        
 
     def lay_pheromone(self, pos, amount: int):
         """
@@ -649,6 +693,9 @@ class Ants(AECEnv):
             
         self._agent_selector.reinit(self.agents)
         self.agent_selection = self._agent_selector.next()
+
+        self.food_distances = {a: self.get_food_distances(a) for a in self.learners}
+
    
     def close(self):
         if self.gui:
@@ -803,22 +850,8 @@ class Ants(AECEnv):
         :return: the reward
         """
         self.agent = current_agent
-        if self.patches[current_agent['pos']]['food'] > 1:
-            cur_reward = self.reward
-        else:
-            cur_reward = 0
-
-        self.rewards_cust[self.agent].append(cur_reward)
-        return cur_reward
-
-    def reward_cluster_and_time_punish_time(self, current_agent):  # DOC NetLogo rewardFunc8
-        """
-
-        :return:
-        """
-        self.agent = current_agent
         if self.patches[self.learners[current_agent]['pos']]['food'] > 1:
-            print('Got a reward!')
+            #print("Got standard reward!")
             cur_reward = self.reward
         else:
             cur_reward = 0
@@ -826,6 +859,22 @@ class Ants(AECEnv):
         self.rewards_cust[self.agent].append(cur_reward)
         return cur_reward
     
+    def calculate_intermediate_reward(self, agent):
+        current_min = np.min(self.get_food_distances(agent))
+        #print(f"current distances: {current_min}")
+        past_min = np.min(self.food_distances[agent])
+        #print(f"past distances: {past_min}") 
+        reward = 0
+
+        if current_min < past_min:
+            #print("Got intermediate reward!")
+            reward = 10  # Un piccolo reward per avvicinarsi al cibo
+        else:
+            #print("Got negative reward!")
+            reward = -1
+
+        return reward
+
     def get_neighborood_chemical(self, agent, as_vectors=False):
         agent_pos = self.learners[agent]["pos"]
         smell_patches = self.smell_patches[agent_pos]
@@ -901,15 +950,15 @@ if __name__ == '__main__':
         env.reset()
         print(f"-------------------------------------------\nEPISODE: {ep}\n-------------------------------------------")
         for tick in range(params['episode_ticks']):
-            for agent in env.agent_iter(max_iter=params["learner_population"]):
-                observation, reward, _ , _, info = env.last(agent)
-                env.step(env.action_space(agent).sample())
+            #for agent in env.agent_iter(max_iter=params["learner_population"]):
+                #observation, reward, _ , _, info = env.last(agent)
+                #env.step(env.action_space(agent).sample())
             
             #env.evaporate_chemical()
-            #env.move()
-            #env._evaporate()
-            #env._diffuse()
-            #env.render()
+            env.move()
+            env._evaporate()
+            env._diffuse()
+            env.render()
             
     # End of simulation
     print("Simulation completed.")

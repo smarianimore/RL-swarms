@@ -11,7 +11,6 @@ import argparse
 import json
 import numpy as np
 import random
-sys.path.append('..\..\..')
 from ants import Ants
 
 RED = (190, 0, 0)
@@ -23,8 +22,8 @@ def create_agent(params:dict, l_params:dict, train_episodes:int):
     learner_population = params['learner_population']
     
     # Q_table
-    qtable = {str(i): np.zeros([4, n_actions]) for i in range(population, population + learner_population)}
-
+    #qtable = {str(i): np.zeros([4, n_actions]) for i in range(population, population + learner_population)}
+    qtable = np.zeros([4, n_actions])
     # DOC dict che tiene conto della frequenza di scelta delle action per ogni episodio {episode: {action: _, action: _, ...}}
     actions_dict = {str(ep): {str(ac): 0 for ac in range(n_actions)} for ep in range(1, train_episodes + 1)}  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
     # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
@@ -52,12 +51,20 @@ def train(env,
     print("Start training...")
     
     old_s = {}  # DOC old state for each agent {agent: old_state}
-    
+    old_action = {} # DOC old action for each agent {agent: old_action}
+     
     for ep in range(1, train_episodes + 1):
         env.reset()
         for tick in range(1, params['episode_ticks'] + 1):
+            total_reward = 0
+
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                cur_state, reward, _, _, _ = env.last(agent)
+                _, reward, _, _, _ = env.last(agent)
+                total_reward+=reward
+
+            for agent in env.agent_iter(max_iter=params['learner_population']):
+                #print("\n\nQ-Learning actions for next agent")
+                cur_state, personal_reward, _, _, _ = env.last(agent)
                 cur_s = utils.state_to_int_map(cur_state)
                 
                 if ep == 1 and tick == 1:
@@ -67,14 +74,25 @@ def train(env,
                     else:
                         action = env.action_space(agent).sample(mask=np.array([0,0,1,1], dtype=np.int8).reshape((-1,)))
                 else:
-                    old_value = qtable[agent][old_s[agent]][action]
-                    if env.learners[int(agent)]['color'] == RED:
-                        next_max = np.max(qtable[agent][cur_s][:2])  # QUESTION: was with [action] too
-                    else:
-                        next_max = np.max(qtable[agent][cur_s][2:])
-                    new_value = (1 - alpha) * old_value + alpha * (reward + gamma * next_max)
-                    qtable[agent][old_s[agent]][action] = new_value
+                    action = old_action[agent]
+                    old_value = qtable[old_s[agent]][action]
+                    """if (old_s[agent] % 2) == 0: # se era rosso
+                        if action > 1: # e ha fatto azioni da arancione
+                            print("ero rosso e ho fatto una cosa da arancione")
+                    elif action <= 1:# se era arancione e ha fatto azioni da rosso
+                        print("ero arancione ma ho fatto una cosa da rosso")"""
 
+
+                    if env.learners[int(agent)]['color'] == RED:
+                        next_max = np.max(qtable[cur_s][:2])  # QUESTION: was with [action] too
+                    else:
+                        next_max = np.max(qtable[cur_s][2:])
+
+                    reward = personal_reward if env.learners[int(agent)]['color'] == RED else total_reward
+                    new_value = (1 - alpha) * old_value + alpha * (reward + gamma * next_max)
+                    qtable[old_s[agent]][action] = new_value
+
+                    print(f"in the state we're in ({cur_state}), the qtable is {qtable[cur_s]}")
                     if random.uniform(0, 1) < epsilon:
                         # action = np.random.randint(0, 2)
                         #action = env.action_space(agent).sample()
@@ -84,12 +102,21 @@ def train(env,
                             action = env.action_space(agent).sample(mask=np.array([0,0,1,1], dtype=np.int8).reshape((-1,)))
                     else:
                         if env.learners[int(agent)]['color'] == RED:
-                            next_max = np.max(qtable[agent][cur_s][:2])  # QUESTION: was with [action] too
+                            action = np.argmax(qtable[cur_s][:2])  # QUESTION: was with [action] too
                         else:
-                            next_max = np.max(qtable[agent][cur_s][2:])
-                
+                            action = np.argmax(qtable[cur_s][2:]) + 2
+                    """
+                   if (cur_s % 2) == 0: # se sono rosso
+                        if action > 1: # e ha fatto azioni da arancione
+                            print("sono rosso e mi fate fare una cosa da arancione")
+                    elif action <= 1:# se era arancione e ha fatto azioni da rosso
+                        print("sono arancione ma mi fate fare una cosa da rosso")
+
+                   """
+                    
                 env.step(action)
                 old_s[agent] = cur_s
+                old_action[agent] = action
 
                 actions_dict[str(ep)][str(action)] += 1
                 action_dict[str(ep)][str(agent)][str(action)] += 1
@@ -115,7 +142,7 @@ def train(env,
                 
                 for l in range(params['population'], params['population'] + params['learner_population']):
                     avg_rew += (reward_dict[str(ep)][str(l)] / params['episode_ticks'])
-                    f.write(f"{action_dict[str(ep)][str(l)]['3']},{action_dict[str(ep)][str(l)]['2']}, {action_dict[str(ep)][str(l)]['0']}, {action_dict[str(ep)][str(l)]['1']}, ")
+                    f.write(f"{action_dict[str(ep)][str(l)]['3']},{action_dict[str(ep)][str(l)]['2']},{action_dict[str(ep)][str(l)]['0']},{action_dict[str(ep)][str(l)]['1']}, ")
                 
                 avg_rew /= params['learner_population']
                 f.write(f"{avg_rew}\n")
@@ -140,14 +167,21 @@ def eval(env,
         env.reset()
         for tick in range(1, params['episode_ticks']+1):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                state, _, _, _ = env.last(agent)
-                #s = utils.state_to_int_map(state.observe())
-                s = state
+                state, _, _, _, _ = env.last(agent)
+                s = utils.state_to_int_map(state.observe())
+                
                 if random.uniform(0, 1) < epsilon:
                     # action = np.random.randint(0, 2)
-                    action = env.action_space(agent).sample()
+                    #action = env.action_space(agent).sample()
+                    if env.learners[int(agent)]['color'] == RED:
+                        action = env.action_space(agent).sample(mask=np.array([1,1,0,0], dtype=np.int8).reshape((-1,)))
+                    else:
+                        action = env.action_space(agent).sample(mask=np.array([0,0,1,1], dtype=np.int8).reshape((-1,)))
                 else:
-                    action = np.argmax(qtable[agent][s])
+                    if env.learners[int(agent)]['color'] == RED:
+                        action = np.argmax(qtable[s][:2])  # QUESTION: was with [action] too
+                    else:
+                        action = np.argmax(qtable[s][2:]) + 2
 
                 env.step(action)
             env.move()
@@ -161,7 +195,7 @@ def eval(env,
             # print(f"\tepisode reward: {reward_episode}")
         #cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
         
-    print(json.dumps(cluster_dict, indent=2))
+    #print(json.dumps(cluster_dict, indent=2))
     print("Testing finished!\n")
     env.close()
 
