@@ -3,6 +3,7 @@ from slime_environments.environments.SlimeEnvMultiAgent import Slime
 
 import sys
 import os
+from tqdm import tqdm
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
@@ -52,10 +53,10 @@ def train(env,
     print("Start training...")
     
     old_s = {}  # DOC old state for each agent {agent: old_state}
-    for ep in range(1, train_episodes + 1):
+    for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
         
-        for tick in range(1, params['episode_ticks'] + 1):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 cur_state, reward, _, _, _ = env.last(agent)
                 cur_s = utils.state_to_int_map(cur_state)
@@ -105,6 +106,7 @@ def train(env,
                 
                 avg_rew /= params['learner_population']
                 f.write(f"{avg_rew}\n")
+            print(f"\tavg reward: {avg_rew}")
 
     #print(json.dumps(cluster_dict, indent=2))
     print("Training finished!\n")
@@ -122,9 +124,9 @@ def eval(env,
     cluster_dict = {}
     print("Start testing...")
     
-    for ep in range(1, test_episodes + 1):
+    for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red'):
         env.reset()
-        for tick in range(1, params['episode_ticks']+1):
+        for tick in tqdm(range(1, params['episode_ticks']+1), desc="TICKS", colour='green'):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 state, _, _, _ = env.last(agent)
                 s = utils.state_to_int_map(state.observe())

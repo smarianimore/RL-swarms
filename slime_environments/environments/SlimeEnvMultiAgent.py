@@ -288,7 +288,8 @@ class Slime(AECEnv):
             self.move()
             self._evaporate()
             self._diffuse()
-            self.render()
+            if self.gui:
+                self.render()
         else:
             self._clear_rewards()
             
