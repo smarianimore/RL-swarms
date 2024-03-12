@@ -2,11 +2,11 @@
   "alpha": 0.25,
   "gamma": 0.9,
   "epsilon": 0.9,
-  "decay": 0.9955,
-  "train_episodes": 1000,
-  "TRAIN_LOG_EVERY": 10,
+  "decay": 0.9997,
+  "train_episodes": 10000,
+  "TRAIN_LOG_EVERY": 100,
   "test_episodes": 10,
   "TEST_LOG_EVERY": 1,
-  "OUTPUT_FILE": "seeking-baseline-01",
+  "OUTPUT_FILE": "seeking-baseline-06",
   "actions": ["move-toward-chemical", "random-walk", "drop-chemical"]
 }

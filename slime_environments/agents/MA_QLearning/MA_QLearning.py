@@ -127,10 +127,10 @@ def eval(env,
     
     for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red'):
         env.reset()
-        for tick in tqdm(range(1, params['episode_ticks']+1), desc="TICKS", colour='green'):
+        for _ in tqdm(range(1, params['episode_ticks']+1), desc="TICKS", colour='green'):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 state, _, _, _, _ = env.last(agent)
-                s = utils.state_to_int_map(state.observe())
+                s = utils.state_to_int_map(state)
 
                 if random.uniform(0, 1) < epsilon:
                     # action = np.random.randint(0, 2)
