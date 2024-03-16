@@ -58,10 +58,10 @@ def train(env,
     print("Start training...")
     
     old_s = {}  # DOC old state for each agent {agent: old_state}
-    for ep in range(1, train_episodes + 1):
+    for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
         
-        for tick in tqdm(range(1, params['episode_ticks'] + 1)):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 cur_state, reward, _, _, _ = env.last(agent)
                 cur_s = utils.state_to_int_map(cur_state)
@@ -146,11 +146,11 @@ def eval(env,
     cluster_dict = {}
     print("Start testing...")
     
-    for ep in range(1, test_episodes + 1):
+    for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red'):
         env.reset()
-        for tick in range(1, params['episode_ticks']+1):
+        for tick in tqdm(range(1, params['episode_ticks']+1), desc="TICKS", colour='green'):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                state, _, _, _ = env.last(agent)
+                state, _, _, _, _ = env.last(agent)
                 s = utils.state_to_int_map(state.observe())
 
                 if random.uniform(0, 1) < epsilon:
