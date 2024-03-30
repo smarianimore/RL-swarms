@@ -6,8 +6,8 @@ import os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from utils.utils import read_params, save_env_image, setup, positional_encoding, update_summary, video_from_images
-from utils.DQN import DQN, ReplayMemory, optimize_model, select_action
+from slime_environments.agents.utils.utils import read_params, save_env_image, setup, positional_encoding, update_summary, video_from_images
+from slime_environments.agents.utils.DQN import DQN, ReplayMemory, optimize_model, select_action
 
 import argparse
 
@@ -143,21 +143,21 @@ def train(env,
             env._diffuse()
             image = env.render()
             
-            if ep in [l_params["fist_saveimages_episode"], l_params["middle_saveimages_episode"], l_params["last_saveimages_episode"]]:
-                if not os.path.exists(os.path.join(output_dir, "images")):
-                        os.makedirs(os.path.join(output_dir, "images"))
-                
-                if ep == int(l_params["fist_saveimages_episode"]):
-                    save_env_image(image, tick, output_dir, "first_episode")
-                elif ep == int(l_params["middle_saveimages_episode"]):
-                    save_env_image(image, tick, output_dir, "middle_episode")
-                elif ep == int(l_params["last_saveimages_episode"]):
-                    save_env_image(image, tick, output_dir, "last_episode")
-            
-            elif ep == int(l_params["fist_saveimages_episode"]) + 1 and tick == 1:
-                video_from_images(output_dir, "first_episode")
-            elif ep == int(l_params["middle_saveimages_episode"]) + 1 and tick == 1:
-                video_from_images(output_dir, "middle_episode")
+            # if ep in [l_params["fist_saveimages_episode"], l_params["middle_saveimages_episode"], l_params["last_saveimages_episode"]]:
+            #     if not os.path.exists(os.path.join(output_dir, "images")):
+            #             os.makedirs(os.path.join(output_dir, "images"))
+            #
+            #     if ep == int(l_params["fist_saveimages_episode"]):
+            #         save_env_image(image, tick, output_dir, "first_episode")
+            #     elif ep == int(l_params["middle_saveimages_episode"]):
+            #         save_env_image(image, tick, output_dir, "middle_episode")
+            #     elif ep == int(l_params["last_saveimages_episode"]):
+            #         save_env_image(image, tick, output_dir, "last_episode")
+            #
+            # elif ep == int(l_params["fist_saveimages_episode"]) + 1 and tick == 1:
+            #     video_from_images(output_dir, "first_episode")
+            # elif ep == int(l_params["middle_saveimages_episode"]) + 1 and tick == 1:
+            #     video_from_images(output_dir, "middle_episode")
             
             
         cluster_dict[str(ep)] = round(env.avg_cluster(), 2)
