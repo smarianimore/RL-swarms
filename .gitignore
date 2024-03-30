@@ -2,3 +2,6 @@
 **/__pycache__
 **/runs/*
 **/models/*
+build/
+dist/
+slime_environments.egg-info/
