@@ -67,22 +67,22 @@ def train(env,
         ((params['learner_population'] / params["cluster_threshold"]) * (params['rew'] ** 2))
     max_possible_pherormone = env.lay_amount * params['learner_population'] * 5
 
-    for ep in range(1, train_episodes + 1):
+    for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
         losses = []
         
         # Initialize the environment and get it's state
-        for tick in tqdm(range(1, params['episode_ticks'] + 1)):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
             for agent in env.agent_iter(max_iter=params['learner_population']):
-                next_state, reward, _, _  = env.last(agent)
-                next_state = torch.tensor(next_state.observe(), dtype=torch.float32, device=device)
+                next_state, reward, _, _, _ = env.last(agent)
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=device)
 
                 if pos_enc:
                     new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                     pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
                     new_pherormone = pos_encoding + new_pherormone 
                 else:
-                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent, True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(int(agent), True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                 
                 #normalization is done considering all the agents in the same patch dropping at the same time pherormone
                 if normalize:
@@ -96,39 +96,39 @@ def train(env,
                 else:
                     state = old_s[agent]
                     action = old_a[agent]
-                    next_action, policy_nets[agent] = select_action(env, agent, next_state, ep, policy_nets[agent], device, epsilon_end, decay)
+                    next_action, policy_nets[int(agent)] = select_action(env, agent, next_state, ep, policy_nets[int(agent)], device, epsilon_end, decay)
                     
                     #normalization is done considering the max reward a single agent can receive
                     reward = torch.tensor([reward], device=device) if not normalize \
                         else torch.tensor([reward / max_possible_reward], device=device)
                     
                     # Store the transition in memory
-                    memory[agent].push(state, action, next_state, reward)
+                    memory[int(agent)].push(state, action, next_state, reward)
                     
                     # Perform one step of the optimization (on the policy network)
-                    policy_nets[agent], target_nets[agent], loss_single = optimize_model(Transition, memory[agent], policy_nets[agent], target_nets[agent], gamma, batch_size, device)
+                    policy_nets[int(agent)], target_nets[int(agent)], loss_single = optimize_model(Transition, memory[int(agent)], policy_nets[int(agent)], target_nets[int(agent)], gamma, batch_size, device)
                     if loss_single is not None:
                         # Optimize the model
-                        optimizers[agent].zero_grad()
+                        optimizers[int(agent)].zero_grad()
                         loss_single.backward()
                         losses.append(torch.Tensor.clone(loss_single.detach()))
                         
                         # In-place gradient clipping
-                        torch.nn.utils.clip_grad_value_(policy_nets[agent].parameters(), 100)
-                        optimizers[agent].step()
-                        schedulers[agent].step()
+                        torch.nn.utils.clip_grad_value_(policy_nets[int(agent)].parameters(), 100)
+                        optimizers[int(agent)].step()
+                        schedulers[int(agent)].step()
                     
                     # Soft update of the target network's weights
                     # θ′ ← τ θ + (1 −τ )θ′
-                    if (agent + tick * learner_population + ep * params['episode_ticks'] * learner_population) % update_net_every == 0:
-                        target_net_state_dict = target_nets[agent].state_dict()
-                        policy_net_state_dict = policy_nets[agent].state_dict()
+                    if (int(agent) + tick * learner_population + ep * params['episode_ticks'] * learner_population) % update_net_every == 0:
+                        target_net_state_dict = target_nets[int(agent)].state_dict()
+                        policy_net_state_dict = policy_nets[int(agent)].state_dict()
                         for key in policy_net_state_dict:
                             target_net_state_dict[key] = policy_net_state_dict[key] * alpha + target_net_state_dict[key] * (1 - alpha)
-                        target_nets[agent].load_state_dict(target_net_state_dict)
+                        target_nets[int(agent)].load_state_dict(target_net_state_dict)
                     
-                epsilon = policy_nets[agent].epsilon
-                cur_lr = optimizers[agent].param_groups[0]['lr']
+                epsilon = policy_nets[int(agent)].epsilon
+                cur_lr = optimizers[int(agent)].param_groups[0]['lr']
                     
                 env.step(next_action.item())
                 old_s[agent] = next_state
@@ -175,8 +175,8 @@ def train(env,
     for agent in range(params['learner_population']):
         policy_model_name = os.path.join(f"policy_{agent}_"  + now.strftime("%m_%d_%Y__%H_%M_%S") + ".pth")
         target_model_name = os.path.join(f"target_{agent}_"  + now.strftime("%m_%d_%Y__%H_%M_%S") + ".pth")
-        torch.save(policy_nets[agent].state_dict(), os.path.join(output_dir, "models", "policies", policy_model_name))
-        torch.save(target_nets[agent].state_dict(), os.path.join(output_dir, "models", "targets", target_model_name))
+        torch.save(policy_nets[int(agent)].state_dict(), os.path.join(output_dir, "models", "policies", policy_model_name))
+        torch.save(target_nets[int(agent)].state_dict(), os.path.join(output_dir, "models", "targets", target_model_name))
 
     return policy_nets, env
 
@@ -190,21 +190,21 @@ def test(env, params, l_params, policy_nets, test_episodes, test_log_every, devi
     decay = l_params["decay"]
     
     max_possible_pherormone = env.lay_amount * params['learner_population'] * 5
-    for ep in range(1, test_episodes + 1):
+    for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
-        for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"epsilon: {policy_net.epsilon}"):
+        for tick in tqdm(range(1, params['episode_ticks'] + 1), desc=f"TICKS (epsilon: {policy_net.epsilon})", colour='green', position=1, leave=False):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 if ep == 1 and tick == 1:
                     policy_nets[agent].epsilon = epsilon_test
-                state, reward, _, _  = env.last(agent)
-                state = torch.tensor(state.observe(), dtype=torch.float32, device=device)
+                state, reward, _, _, _ = env.last(agent)
+                state = torch.tensor(state, dtype=torch.float32, device=device)
 
                 if pos_enc:
-                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(int(agent)).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                     pos_encoding = torch.tensor(positional_encoding(new_pherormone.numel(), 2), dtype=torch.float32).to(device).unsqueeze(0)
                     new_pherormone = pos_encoding + new_pherormone 
                 else:
-                    new_pherormone = torch.tensor(env.get_neighborood_chemical(agent, True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
+                    new_pherormone = torch.tensor(env.get_neighborood_chemical(int(agent), True).reshape(-1,1), dtype=torch.float32).to(device).unsqueeze(0)
                 
                 #normalization is done considering all the agents in the same patch dropping at the same time pherormone
                 if normalize:
@@ -212,7 +212,7 @@ def test(env, params, l_params, policy_nets, test_episodes, test_log_every, devi
                     
                 state = torch.cat((torch.flatten(new_pherormone), state)).unsqueeze(0)
                     
-                action, policy_net = select_action(env, agent, state, ep, policy_nets[agent], device, epsilon_end, decay)
+                action, policy_net = select_action(env, agent, state, ep, policy_nets[int(agent)], device, epsilon_end, decay)
                 env.step(action)
                 
             env.move()
@@ -283,27 +283,35 @@ def main(args):
     else:
         for ag in range(population, population + learner_population):
             target_nets[ag].load_state_dict(policy_nets[ag].state_dict())
-    
+
     if args.train:
+        print("[INFO] Start training...")
+        train_start = datetime.datetime.now()
         policy_nets, env = train(env, params, l_params, device, policy_nets, target_nets, train_episodes, train_log_every, output_file, output_dir, args.normalize_input, args.positional_encoding)
+        train_end = datetime.datetime.now()
+        print(f"Training time: {train_end - train_start}")
         
     if args.test:
+        print("[INFO] Start testing...")
+        test_start = datetime.datetime.now()
         test(env, params, l_params, policy_nets, test_episodes, test_log_every, device, args.normalize_input, args.positional_encoding)
+        test_end = datetime.datetime.now()
+        print(f"Testing time: {test_end - test_start}")
 
     env.close()
     
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("params_path", type=str)
-    parser.add_argument("learning_params_path", type=str)
+    parser.add_argument("--params_path", type=str, default="dqdec-env-params.json", required=False)
+    parser.add_argument("--learning_params_path", type=str, default="dqdec-learning-params.json", required=False)
     parser.add_argument("--policy-model-name", type=str, default="")
     parser.add_argument("--target-model-name", type=str, default="")
     parser.add_argument("--models-path", type=str, default="")
     parser.add_argument("--normalize-input", action="store_true")
     parser.add_argument("--positional-encoding", action="store_true")
-    parser.add_argument("--train", action="store_true")
-    parser.add_argument("--test", action="store_true")
+    parser.add_argument("--train", action="store_true", default=True)
+    parser.add_argument("--test", action="store_true", default=True)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--random-seed", type=int, default=0)
     
