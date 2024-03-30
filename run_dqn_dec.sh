@@ -1,0 +1,1 @@
+python slime_environments/agents/DQNet_Decentralized/Decentralized.py --params_path=slime_environments/agents/DQNet_Decentralized/dqdec-env-params.json --learning_params_path=slime_environments/agents/DQNet_Decentralized/dqdec-learning-params.json
