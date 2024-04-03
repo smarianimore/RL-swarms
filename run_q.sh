@@ -1,0 +1,1 @@
+python slime_environments/agents/MA_QLearning/MA_QLearning.py --params_path=slime_environments/agents/MA_QLearning/qLearning-env-params.json --learning_params_path=slime_environments/agents/MA_QLearning/qLearning-learning-params.json
