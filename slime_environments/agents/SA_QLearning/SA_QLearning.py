@@ -1,4 +1,4 @@
-#from environments.SlimeEnvSingleAgent import Slime
+from environments.SlimeEnvSingleAgent import Slime
 
 import datetime
 import gymnasium as gym

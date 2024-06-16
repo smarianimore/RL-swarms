@@ -1,0 +1,12 @@
+{
+  "alpha": 0.1,
+  "gamma": 0.9,
+  "epsilon": 0.9,
+  "decay": 0.9,
+  "train_episodes": 1000,
+  "TRAIN_LOG_EVERY": 10,
+  "test_episodes": 10,
+  "TEST_LOG_EVERY": 1,
+  "OUTPUT_FILE": "ants-multi-test-01",
+  "actions": ["move-toward-chemical", "random-walk", "move-toward-nest+drop-chemical","move-toward-nest"]
+}
