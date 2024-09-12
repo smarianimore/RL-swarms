@@ -1,22 +1,18 @@
 import json
 from jaxenvs.envs.slime.slime_env_multi_agent import Slime
 
-PARAMS_FILE = "jaxenvs/configs/multi_agent_env_params.json"
-EPISODES = 5
-LOG_EVERY = 1
-
 def test(file, episodes, log):
-
-    with open(PARAMS_FILE) as f:
+    with open(file) as f:
         params = json.load(f)
-    if params["gui"]:
-        render = "human"
-    else:
-        render = "server"
 
-    env = Slime(render_mode=render, **params)
+    #if params["gui"]:
+    #    render = "human"
+    #else:
+    #    render = "server"
+    
+    env = Slime(**params)
 
-    for ep in range(1, EPISODES + 1):
+    for ep in range(1, episodes + 1):
         env.reset()
         print(
             f"-------------------------------------------\nEPISODE: {ep}\n-------------------------------------------")

@@ -6,15 +6,15 @@ import json
 PARAMS_FILE = "jaxenvs/configs/multi_agent_env_params.json"
 
 def test_api(file):
-    
     with open(file) as f:
         params = json.load(f)
-    if params["gui"]:
-        render = "human"
-    else:
-        render = "server"
+
+    #if params["gui"]:
+    #    render = "human"
+    #else:
+    #    render = "server"
     
-    env = Slime(render_mode=render, **params)
+    env = Slime(**params)
     
     api_test(env, num_cycles=100, verbose_progress=True)
     print(f"Environment compatible with Gymnasium {pettingzoo.__version__=}")
