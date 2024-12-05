@@ -1,0 +1,155 @@
+patches-own [
+  pheromone            ;; amount of pheromone on this patch
+  food                 ;; amount of food on this patch (0, 1, or 2)
+]
+
+turtles-own [
+  carrying-food?
+]
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Setup procedures ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+to setup
+  clear-all
+  set-default-shape turtles "bug"
+  setup-patches
+  reset-ticks
+end
+
+to setup-patches
+  setup-nest
+  setup-food
+  recolor-patches
+end
+
+to setup-nest
+  ask patches with [ nest? ] [
+    set pcolor violet
+  ]
+end
+
+to setup-food
+  ;; setup a food source on the right
+  ask patch (0.6 * max-pxcor) 0 [
+    make-food-source cyan
+  ]
+  ;; setup a food source on the lower-left
+  ask patch (-0.6 * max-pxcor) (-0.6 * max-pycor) [
+    make-food-source sky
+  ]
+  ;; setup a food source on the upper-left
+  ask patch (-0.8 * max-pxcor) (0.8 * max-pycor) [
+    make-food-source blue
+  ]
+end
+
+to make-food-source [ food-source-color ] ;; patch procedure
+  ask patches with [ distance myself < 5 ] [
+    set food 2
+    set pcolor food-source-color
+  ]
+end
+
+to recolor-patches
+  ask patches with [ food = 0 and not nest? ] [
+    ;; scale color to show pheromone concentration
+    set pcolor scale-color green pheromone 0.1 5
+  ]
+end
+
+;;;;;;;;;;;;;;;;;;;;;
+;;; Go procedures ;;;
+;;;;;;;;;;;;;;;;;;;;;
+
+to go  ;; forever button
+  ;; add ants one at a time
+  if count turtles < population [ create-ant ]
+
+  ask turtles [
+    move
+    recolor
+  ]
+  diffuse pheromone (diffusion-rate / 100)
+  ask patches [
+    ;; slowly evaporate pheromone
+    set pheromone pheromone * (100 - evaporation-rate) / 100
+    if pheromone < 0.05 [ set pheromone 0 ]
+  ]
+  recolor-patches
+  tick
+end
+
+to move  ;; turtle procedure
+  if not carrying-food? [ look-for-food  ]  ;; if not carrying food, look for it
+  if carrying-food? [ move-towards-nest ]   ;; if carrying food head back to the nest
+  wander                                    ;; turn a small random amount and move forward
+end
+
+to create-ant
+  create-turtles 1 [
+    set size 2  ;; easier to see
+    set carrying-food? false
+  ]
+end
+
+to move-towards-nest  ;; turtle procedure
+  ifelse nest? [
+    ;; drop food and head out again
+    set carrying-food? false
+    rt 180
+  ] [
+    set pheromone pheromone + 60  ;; drop some pheromone
+    ;; turn towards the nest, which is at the center
+    facexy 0 0
+  ]
+end
+
+to look-for-food  ;; turtle procedure
+  ifelse food > 0 [
+    set carrying-food? true  ;; pick up food
+    set food food - 1        ;; and reduce the food source
+    rt 180                   ;; and turn around
+  ] [ ;; go in the direction where the pheromone smell is strongest
+    uphill-pheromone
+  ]
+end
+
+;; sniff left and right, and go where the strongest smell is
+to uphill-pheromone  ;; turtle procedure
+  ;; only turn if the current patch doesn't have much pheromone
+  if pheromone < 2 [
+    let scent-ahead pheromone-scent-at-angle   0
+    let scent-right pheromone-scent-at-angle  45
+    let scent-left  pheromone-scent-at-angle -45
+    if (scent-right > scent-ahead) or (scent-left > scent-ahead) [
+      ifelse scent-right > scent-left
+        [ rt 45 ]
+        [ lt 45 ]
+    ]
+  ]
+end
+
+to wander  ;; turtle procedure
+  rt random 40
+  lt random 40
+  if not can-move? 1 [ rt 180 ]
+  fd 1
+end
+
+to recolor  ;; turtle procedure
+  ifelse carrying-food?
+    [ set color orange + 1 ]
+    [ set color red ]
+end
+
+to-report pheromone-scent-at-angle [ angle ]
+  let p patch-right-and-ahead angle 1
+  if p = nobody [ report 0 ]
+  report [ pheromone ] of p
+end
+
+to-report nest? ;; patch or turtle reporter
+  report distancexy 0 0 < 5
+end
