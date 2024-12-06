@@ -9,7 +9,7 @@ import random
 
 from agents.utils.utils import read_params
 from environments.slime.slime import Slime
-from agents.IQLearning.slime import iql
+from agents.IQLearning import iql
 
 def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
     population = params['population']
@@ -240,21 +240,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning_params_path",
         type=str,
-        default="agents/IQLearning/slime/config/learning-params.json",
+        default="agents/IQLearning/config/learning-params.json",
         required=False
     )
     
     parser.add_argument(
         "--logger_params_path",
         type=str,
-        default="agents/IQLearning/slime/config/logger-params.json",
+        default="agents/IQLearning/config/logger-params.json",
         required=False
     )
 
     parser.add_argument(
         "--qtable_path",
         type=str,
-        #default="qLearning-learning-params.json",
         required=False
     )
     
