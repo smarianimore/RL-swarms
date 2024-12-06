@@ -72,7 +72,6 @@ def train(
         
         if ep % train_log_every == 0:
             avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
-            #avg_cluster = round(env.avg_cluster(), 2)
             avg_cluster = round(env.avg_cluster2(), 2)
             eps = round(epsilon, 4)
             value = [ep, tick * ep, avg_cluster, avg_rew]
@@ -142,7 +141,6 @@ def eval(
         
         if ep % test_log_every == 0:
             avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
-            #avg_cluster = round(env.avg_cluster(), 2)
             avg_cluster = round(env.avg_cluster2(), 2)
             value = [ep, tick * ep, avg_cluster, avg_rew]
             value.extend(list(actions_dict[str(ep)].values()))

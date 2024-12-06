@@ -44,6 +44,47 @@ class Slime(AECEnv):
                  seed,
                  render_mode: Optional[str] = None,
                  **kwargs):
+        """
+        :param population:          Controls the number of non-learning slimes (= green turtles)
+        :param sniff_threshold:     Controls how sensitive slimes are to pheromone (higher values make slimes less
+                                    sensitive to pheromone)—unclear effect on learning, could be negligible
+        :param diffuse_area         Controls the diffusion radius
+        :param diffuse_mode         Controls in which order patches with pheromone to diffuse are visited:
+                                        'simple' = Python-dependant (dict keys "ordering")
+                                        'rng' = random visiting
+                                        'sorted' = diffuse first the patches with more pheromone
+                                        'filter' = do not re-diffuse patches receiving pheromone due to diffusion
+                                        'cascade' = step-by-step diffusion within 'diffuse_area'
+        :param follow_mode          Controls how non-learning agents follow pheromone:
+                                        'det' = follow greatest pheromone
+                                        'prob' = follow greatest pheromone probabilistically (pheromone strength as weight)
+        :param smell_area:          Controls the radius of the square area sorrounding the turtle whithin which it smells pheromone
+        :param lay_area:            Controls the radius of the square area sorrounding the turtle where pheromone is laid
+        :param lay_amount:          Controls how much pheromone is laid
+        :param evaporation:         Controls how much pheromone evaporates at each step
+        :param cluster_threshold:   Controls the minimum number of slimes needed to consider an aggregate within
+                                    cluster-radius a cluster (the higher the more difficult to consider an aggregate a
+                                    cluster)—the higher the more difficult to obtain a positive reward for being within
+                                    a cluster for learning slimes
+        :param cluster_radius:      Controls the range considered by slimes to count other slimes within a cluster (the
+                                    higher the easier to form clusters, as turtles far apart are still counted together)
+                                    —the higher the easier it is to obtain a positive reward for being within a cluster
+                                    for learning slimes
+        :param rew:                 Base reward for being in a cluster
+        :param penalty:             Base penalty for not being in a cluster
+        :param episode_ticks:       Number of ticks for episode termination
+        :param W:                   Window width in # patches
+        :param H:                   Window height in # patches
+        :param PATCH_SIZE:          Patch size in pixels
+        :param TURTLE_SIZE:         Turtle size in pixels
+        :param FPS:                 Rendering FPS
+        :param SHADE_STRENGTH:      Strength of color shading for pheromone rendering (higher -> brighter color)
+        :param SHOW_CHEM_TEXT:      Whether to show pheromone amount on patches (when >= sniff-threshold)
+        :param CLUSTER_FONT_SIZE:   Font size of cluster number (for overlapping agents)
+        :param CHEMICAL_FONT_SIZE:  Font size of phermone amount (if SHOW_CHEM_TEXT is true)
+        :param render_mode:
+        """
+
         assert render_mode is None or render_mode in self.metadata["render_modes"]
 
         np.random.seed(seed)
@@ -122,6 +163,8 @@ class Slime(AECEnv):
         }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
         
         self.obs_type = kwargs['obs_type']
+        # DOC obervation is an array of 8 real elements.
+        # This array indicates the pheromone values in the 8 patches around the agent.
         if self.obs_type == "paper":
             self._observation_spaces = {
                 a: Box(low=0.0, high=np.inf, shape=(8,), dtype=np.float32)
@@ -141,6 +184,11 @@ class Slime(AECEnv):
         )
 
     def _find_neighbours_cascade(self, area: int):
+        """
+        For each patch, find neighbouring patches within square radius 'area', 1 step at a time
+        (visiting first 1-hop patches, then 2-hops patches, and so on)
+        """
+
         neighbours = {}
         
         for p in self.patches:
@@ -175,6 +223,10 @@ class Slime(AECEnv):
         return neighbours
 
     def _find_neighbours(self, area: int):
+        """
+        For each patch, find neighbouring patches within square radius 'area'
+        """
+
         neighbours = {}
         
         for p in self.patches:
@@ -200,6 +252,13 @@ class Slime(AECEnv):
         return neighbours
 
     def _wrap(self, x: int, y: int):
+        """
+        Wrap x,y coordinates around the torus
+
+        :param x: the x coordinate to wrap
+        :param y: the y coordinate to wrap
+        :return: the wrapped x, y
+        """
         return x % self.W_pixels, y % self.H_pixels
 
     # learners act
@@ -279,6 +338,9 @@ class Slime(AECEnv):
     """
 
     def process_agent(self, cluster_ticks, rewards_cust):
+        """
+        In this methods we compute the agent's reward and it's observation.
+        """
         cluster = self._compute_cluster(self.agent)
 
         if self.reward_type == "cluster":
@@ -316,6 +378,10 @@ class Slime(AECEnv):
     '''
 
     def _get_obs(self, pos):
+        """
+        This method return the observation give by the env.
+        The array indicates the pheromone values in the 8 patches around the agent.
+        """
         field_of_view = [
             self._wrap(r, c)
             for r in range(pos[0] - self.patch_size, pos[0] + 2 * self.patch_size, self.patch_size)
@@ -326,6 +392,10 @@ class Slime(AECEnv):
         return obs 
 
     def convert_observation(self, obs):
+        """
+        This method returns the conversion of the observation to an integer.
+        It's useful for IQL.
+        """
         if self.obs_type == "paper":
             if np.unique(obs).shape[0] == 1:
                 obs_id = np.random.randint(8)
@@ -336,12 +406,23 @@ class Slime(AECEnv):
         return obs_id
 
     def lay_pheromone(self, patches, pos):
+        """
+        Lay 'amount' pheromone in square 'area' centred in 'pos'
+        """
         for p in self.lay_patches[pos]:
             patches[p]['chemical'] += self.lay_amount
         
         return patches
 
     def _diffuse(self, patches):
+        """
+        Diffuses pheromone from each patch to nearby patches controlled through self.diffuse_area patches in a way
+        controlled through self.diffuse_mode:
+            'simple' = Python-dependant (dict keys "ordering")
+            'rng' = random visiting
+            'sorted' = diffuse first the patches with more pheromone
+            'filter' = do not re-diffuse patches receiving pheromone due to diffusion
+        """
         n_size = len(self.diffuse_patches[list(patches.keys())[0]])  # same for every patch
         patch_keys = list(patches.keys())
         
@@ -372,6 +453,10 @@ class Slime(AECEnv):
         return patches
     
     def _diffuse2(self, patches):
+        """
+        This diffuse method use a gaussian filter for the process.
+        This is a kind of parallel diffusion.
+        """
         grid = np.array([patches[p]["chemical"] for p in patches.keys()]).reshape((self.W, self.H))
         grid = gaussian_filter(grid, sigma=self.diffuse_area, mode="wrap")
         grid = grid.flatten()
@@ -380,6 +465,9 @@ class Slime(AECEnv):
         return patches
 
     def _evaporate(self, patches):
+        """
+        Evaporates pheromone from each patch according to param self.evaporation
+        """
         for patch in patches.keys():
             #if patches[patch]['chemical'] > 0:
             patches[patch]['chemical'] *= self.evaporation
@@ -387,6 +475,10 @@ class Slime(AECEnv):
         return patches
 
     def _diffuse_and_evaporate(self, patches):
+        """
+        This method combine the _diffuse2 and _evaporate methods in one function.
+        It is the method currently used.
+        """
         # Diffusion
         grid = np.array([patches[p]["chemical"] for p in patches.keys()]).reshape((self.W, self.H))
         grid = gaussian_filter(grid, sigma=self.diffuse_area, mode="wrap")
@@ -399,7 +491,10 @@ class Slime(AECEnv):
         
         return patches
 
-    def walk(self, patches, turtle):      
+    def walk(self, patches, turtle):
+        """
+        Action 0: move in random direction (8 sorrounding cells)
+        """      
         choice = [self.patch_size, -self.patch_size, 0]
         x, y = turtle['pos']
         patches[turtle['pos']]['turtles'].remove(self.agent)
@@ -414,6 +509,9 @@ class Slime(AECEnv):
         return patches, turtle
 
     def run_away_pheromone(self, patches, ph_coords, turtle):
+        """
+        Action 3: don't follow/avoid the pheromone.
+        """
         x, y = turtle['pos']
         patches[turtle['pos']]['turtles'].remove(self.agent)
         if ph_coords[0] > x and ph_coords[1] > y:
@@ -455,6 +553,9 @@ class Slime(AECEnv):
         return patches
 
     def follow_pheromone(self, patches, ph_coords, turtle):
+        """
+        Action 2: move turtle towards greatest pheromone found
+        """
         x, y = turtle['pos']
         patches[turtle['pos']]['turtles'].remove(self.agent)
         if ph_coords[0] > x and ph_coords[1] > y:  # top right
@@ -486,6 +587,12 @@ class Slime(AECEnv):
         return patches
 
     def _find_max_pheromone(self, pos):
+        """
+        Find where the maximum pheromone level is within a square controlled by self.smell_area centred in 'pos'.
+        Following pheromone modeis controlled by param self.follow_mode:
+            'det' = follow greatest pheromone
+            'prob' = follow greatest pheromone probabilistically (pheromone strength as weight)
+        """
         if self.follow_mode == "prob":
             population = [k for k in self.smell_patches[pos]]
             weights = [self.patches[k]['chemical'] for k in self.smell_patches[pos]]
@@ -509,39 +616,49 @@ class Slime(AECEnv):
         return max_ph, winner
 
     def _compute_cluster(self, current_agent):
+        """
+        Checks whether the learner turtle is within a cluster, given 'cluster_radius' and 'cluster_threshold'
+        """
         cluster = 0
         for p in self.cluster_patches[self.learners[current_agent]['pos']]:
             cluster += len(self.patches[p]['turtles'])
 
         return cluster
 
-    def avg_cluster(self):
-        cluster_sizes = []  # registra la dim. dei cluster
-        for l in self.learners:
-            cluster = []  # tiene conto di quali turtle sono in quel cluster
-            for p in self.cluster_patches[self.learners[l]['pos']]:
-                for t in self.patches[p]['turtles']:
-                    cluster.append(t)
-            cluster.sort()
-            if cluster not in cluster_sizes:
-                cluster_sizes.append(cluster)
+    #def avg_cluster(self):
+    #    """
+    #    Record the cluster size. It's a fuzzy computation.
+    #    """
+    #    cluster_sizes = []  # registra la dim. dei cluster
+    #    for l in self.learners:
+    #        cluster = []  # tiene conto di quali turtle sono in quel cluster
+    #        for p in self.cluster_patches[self.learners[l]['pos']]:
+    #            for t in self.patches[p]['turtles']:
+    #                cluster.append(t)
+    #        cluster.sort()
+    #        if cluster not in cluster_sizes:
+    #            cluster_sizes.append(cluster)
 
-        # cleaning process: confornta i cluster (nello stesso episodio) e se ne trova 2 con più del 90% di turtle uguali ne elimina 1
-        for cluster in cluster_sizes:
-            for cl in cluster_sizes:
-                if cl != cluster:
-                    intersection = list(set(cluster) & set(cl))
-                    if len(intersection) > len(cluster) * 0.90:
-                        cluster_sizes.remove(cl)
+    #    # cleaning process: confornta i cluster (nello stesso episodio) e se ne trova 2 con più del 90% di turtle uguali ne elimina 1
+    #    for cluster in cluster_sizes:
+    #        for cl in cluster_sizes:
+    #            if cl != cluster:
+    #                intersection = list(set(cluster) & set(cl))
+    #                if len(intersection) > len(cluster) * 0.90:
+    #                    cluster_sizes.remove(cl)
 
-        # calcolo avg_cluster_size
-        somma = 0
-        for cluster in cluster_sizes:
-            somma += len(cluster)
-        avg_cluster_size = somma / len(cluster_sizes)
-        return avg_cluster_size
+    #    # calcolo avg_cluster_size
+    #    somma = 0
+    #    for cluster in cluster_sizes:
+    #        somma += len(cluster)
+    #    avg_cluster_size = somma / len(cluster_sizes)
+    #    return avg_cluster_size
     
     def avg_cluster2(self):
+        """
+        Same compuation as avg_cluster.
+        Use THIS for calculating the average, avg_cluster has a bug!
+        """
         cluster_sizes = []  # registra la dim. dei cluster
         for l in self.learners:
             cluster = []  # tiene conto di quali turtle sono in quel cluster
@@ -569,6 +686,9 @@ class Slime(AECEnv):
         return avg_cluster_size
 
     def _check_chemical(self, current_agent):
+        """
+        Checks whether there is pheromone on the patch where the learner turtle is
+        """
         return self.patches[self.learners[current_agent]['pos']][
                    'chemical'] > self.sniff_threshold
 
@@ -591,6 +711,10 @@ class Slime(AECEnv):
         return cur_reward
 
     def reward_cluster_punish_time(self, current_agent):  # DOC NetLogo rewardFunc7
+        """
+        Reward is (positve) proportional to cluster size (quadratic) and (negative) proportional to time spent outside
+        clusters
+        """
         self.agent = current_agent
         cluster = self._compute_cluster(self.agent)
         if cluster >= self.cluster_threshold:
@@ -603,6 +727,9 @@ class Slime(AECEnv):
         return cur_reward
 
     def reward_cluster_and_time_punish_time(self, cluster_ticks, rewards_cust, cluster):
+        """
+        The clustering reward used in the article.
+        """
         if cluster >= self.cluster_threshold:
             cluster_ticks[self.agent] += 1
 
@@ -614,6 +741,9 @@ class Slime(AECEnv):
         return cluster_ticks, rewards_cust, cur_reward
     
     def reward_scatter_and_time_punish_time(self, cluster_ticks, rewards_cust, cluster):
+        """
+        The scattering reward used in the article.
+        """
         if cluster >= self.cluster_threshold:
             cluster_ticks[self.agent] += 1
 
@@ -625,6 +755,9 @@ class Slime(AECEnv):
         return cluster_ticks, rewards_cust, cur_reward
 
     def reset(self, seed=None, return_info=True, options=None):
+        """
+        Reset env.
+        """
         # empty stuff
         pop_tot = self.population + self.learner_population
         self.rewards_cust = {i: [] for i in range(self.population, pop_tot)}
