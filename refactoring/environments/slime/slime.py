@@ -400,7 +400,7 @@ class Slime(AECEnv):
     def _get_new_direction(self, f, n_patches, old_dir, new_pos):
         start = (old_dir - (n_patches // 2)) % self.N_DIRS 
         idx_dir = np.where(np.all(f == new_pos, axis=1))[0].item()
-        new_dirs = [(i + start) % self.N_DIRS for i in range(n_patches)]
+        new_dirs = np.array([(i + start) % self.N_DIRS for i in range(n_patches)])
         return new_dirs[idx_dir]
 
     def process_agent(self, cluster_ticks, rewards_cust):
@@ -447,7 +447,7 @@ class Slime(AECEnv):
         return obs 
 
     def _get_obs2(self, agent):
-        f, _ = self._get_new_positions(self.sniff_patches, agent)
+        f, _ = self._get_new_positions(self.ph_fov, agent)
         obs = np.array([self.patches[tuple(i)]["chemical"] for i in f])
         return obs
 
@@ -569,13 +569,13 @@ class Slime(AECEnv):
         return patches, turtle
     
     def walk2(self, patches, turtle):
-        f, direction = self._get_new_positions(self.wiggle_patches, turtle)
+        f, direction = self._get_new_positions(self.fov, turtle)
         rng = np.random.default_rng()
         new_turtle_pos = rng.choice(f)
         patches[turtle['pos']]['turtles'].remove(self.agent)
         turtle["pos"] = tuple(new_turtle_pos)
         patches[turtle['pos']]['turtles'].append(self.agent)
-        turtle["dir"] = self._get_new_direction(f, direction, new_turtle_pos)
+        turtle["dir"] = self._get_new_direction(f, self.wiggle_patches, direction, new_turtle_pos)
         return patches, turtle
 
     def run_away_pheromone(self, patches, ph_coords, turtle):
@@ -684,6 +684,14 @@ class Slime(AECEnv):
             winner = max_pos[np.random.choice(len(max_pos))]
 
         return max_ph, winner
+
+    def _find_max_pheromone2(self, agent, obs):
+        f, direction = self._get_new_positions(self.ph_fov, agent)
+        idx = obs.argmax().item()
+        ph_val = obs[idx]
+        ph_pos = tuple(f[idx])
+        ph_dir = self._get_new_direction(f, self.sniff_patches, direction, ph_pos)
+        return ph_val, ph_pos, ph_dir
 
     def _compute_cluster(self, current_agent):
         """
