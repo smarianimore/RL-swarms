@@ -395,7 +395,7 @@ class Slime(AECEnv):
     def _get_new_positions(self, possible_patches, agent):
         pos = agent["pos"]
         direction = agent["dir"]
-        return possible_patches[pos][direction]
+        return possible_patches[pos][direction], direction
 
     def _get_new_direction(self, f, n_patches, old_dir, new_pos):
         start = (old_dir - (n_patches // 2)) % self.N_DIRS 
@@ -447,7 +447,7 @@ class Slime(AECEnv):
         return obs 
 
     def _get_obs2(self, agent):
-        f = self._get_new_positions(self.sniff_patches, agent)
+        f, _ = self._get_new_positions(self.sniff_patches, agent)
         obs = np.array([self.patches[tuple(i)]["chemical"] for i in f])
         return obs
 
@@ -566,6 +566,16 @@ class Slime(AECEnv):
         turtle['pos'] = (x2, y2)
         patches[turtle['pos']]['turtles'].append(self.agent)
 
+        return patches, turtle
+    
+    def walk2(self, patches, turtle):
+        f, direction = self._get_new_positions(self.wiggle_patches, turtle)
+        rng = np.random.default_rng()
+        new_turtle_pos = rng.choice(f)
+        patches[turtle['pos']]['turtles'].remove(self.agent)
+        turtle["pos"] = tuple(new_turtle_pos)
+        patches[turtle['pos']]['turtles'].append(self.agent)
+        turtle["dir"] = self._get_new_direction(f, direction, new_turtle_pos)
         return patches, turtle
 
     def run_away_pheromone(self, patches, ph_coords, turtle):
