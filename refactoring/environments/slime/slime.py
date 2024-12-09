@@ -93,7 +93,6 @@ class Slime(AECEnv):
         self.population = kwargs['population']
         self.learner_population = kwargs['learner_population']
         self.sniff_threshold = kwargs['sniff_threshold']
-        self.sniff_patches = kwargs['sniff_patches']
         self.diffuse_area = kwargs['diffuse_area']
         self.smell_area = kwargs['smell_area']
         self.lay_area = kwargs['lay_area']
@@ -101,7 +100,6 @@ class Slime(AECEnv):
         self.evaporation = kwargs['evaporation']
         self.diffuse_mode = kwargs['diffuse_mode']
         self.follow_mode = kwargs['follow_mode']
-        self.wiggle_patches = kwargs['wiggle_patches'] 
         self.cluster_threshold = kwargs['cluster_threshold']
         self.cluster_radius = kwargs['cluster_radius']
         self.reward_type = kwargs['reward_type']
@@ -115,17 +113,35 @@ class Slime(AECEnv):
         self.turtle_size = kwargs['TURTLE_SIZE']
 
         self.N_DIRS = 8
+        self.sniff_patches = kwargs['sniff_patches']
+        self.wiggle_patches = kwargs['wiggle_patches'] 
+        assert (
+            self.sniff_patches in (1, 3, 5, 7, 8)
+        ), "Error! sniff_patches admitted values are: 1, 3, 5, 7, 8."
+        assert (
+            self.wiggle_patches in (1, 3, 5, 7, 8)
+        ), "Error! wiggle_patches admitted values are: 1, 3, 5, 7, 8."
         # Used to calculate the agent's directions.
         # It's a personal convention.
+        #self.movements = np.array([
+        #    (0, self.patch_size),                   # dir 0
+        #    (self.patch_size, self.patch_size),     # dir 1
+        #    (self.patch_size, 0),                   # dir 2
+        #    (self.patch_size, -self.patch_size),    # dir 3
+        #    (0, -self.patch_size),                  # dir 4
+        #    (-self.patch_size, -self.patch_size),   # dir 5
+        #    (-self.patch_size, 0),                  # dir 6
+        #    (-self.patch_size, self.patch_size),    # dir 7
+        #])
         self.movements = np.array([
-            (0, self.patch_size),
-            (self.patch_size, self.patch_size),
-            (self.patch_size, 0),
-            (self.patch_size, -self.patch_size),
-            (0, -self.patch_size),
-            (-self.patch_size, -self.patch_size),
-            (-self.patch_size, 0),
-            (-self.patch_size, self.patch_size),
+            (0, -self.patch_size),                  # dir 0
+            (self.patch_size, -self.patch_size),    # dir 1
+            (self.patch_size, 0),                   # dir 2
+            (self.patch_size, self.patch_size),     # dir 3
+            (0, self.patch_size),                   # dir 4
+            (-self.patch_size, self.patch_size),    # dir 5
+            (-self.patch_size, 0),                  # dir 6
+            (-self.patch_size, -self.patch_size),   # dir 7
         ])
 
         self.coords = []
@@ -180,7 +196,7 @@ class Slime(AECEnv):
         # Agent's field of view
         self.fov = self._field_of_view(self.wiggle_patches)
         # Agent's pheromone field of view
-        self.ph_fov = self._field_of_view(self.smell_patches)
+        self.ph_fov = self._field_of_view(self.sniff_patches)
 
         self.actions = kwargs['actions']
         self._action_spaces = {
@@ -671,7 +687,7 @@ class Slime(AECEnv):
         patches[turtle['pos']]['turtles'].remove(self.agent)
         turtle["pos"] = ph_coords
         patches[turtle['pos']]['turtles'].append(self.agent)
-        turtle["dir"] = self._get_new_direction(f, direction, ph_coords)
+        turtle["dir"] = self._get_new_direction(f, self.sniff_patches, direction, ph_coords)
         return patches, turtle
 
     def _find_max_pheromone(self, pos):
@@ -914,6 +930,7 @@ BLUE = (0, 0, 255)
 WHITE = (255, 255, 255)
 RED = (190, 0, 0)
 GREEN = (0, 190, 0)
+YELLOW = (250, 250, 0)
 
 class SlimeVisualizer:
     def __init__(
@@ -942,11 +959,30 @@ class SlimeVisualizer:
         self.chemical_font = pygame.font.SysFont("arial", self.chemical_font_size)
         self.first_gui = True
 
+        self.N_DIRS = 8
+        self.wiggle_patches = kwargs["wiggle_patches"]
+        self.dirs = self._get_dirs()
+
+    def _get_dirs(self):
+        central = self.wiggle_patches // 2
+        sliding_window = []
+        
+        for i in range(self.N_DIRS):
+            tmp = []
+            for j in range(self.wiggle_patches):
+                tmp.append((i + j) % self.N_DIRS)
+            sliding_window.append(tmp)
+        
+        sliding_window = sorted(sliding_window, key=lambda x: x[central])
+        return np.array(sliding_window)
+
     def render(
         self,
         patches,
         learners,
-        turtles
+        turtles,
+        fov,
+        ph_fov
     ):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:  # window closed -> program quits
@@ -979,6 +1015,47 @@ class SlimeVisualizer:
         # draw learners
         for learner in learners.values():
             pygame.draw.circle(self.screen, RED, (learner['pos'][0], learner['pos'][1]), self.turtle_size // 2)
+
+            if len(fov[learner["pos"]].shape) > 2:
+                view = fov[learner["pos"]][learner["dir"]]
+                dirs = self.dirs[learner["dir"]]
+            else:
+                view = fov[learner["pos"]]
+                dirs = self.dirs[4]
+
+            for f, d in zip(view, dirs):
+                pygame.draw.rect(
+                    self.screen,
+                    YELLOW,
+                    pygame.Rect(
+                        f[0] - self.offset,
+                        f[1] - self.offset,
+                        self.patch_size,
+                        self.patch_size
+                    )
+                )
+                text = self.cluster_font.render(str(d), True, BLACK)
+                self.screen.blit(text, text.get_rect(center=f))
+
+            #if len(ph_fov[learner["pos"]].shape) > 2:
+            #    ph = ph_fov[learner["pos"]][learner["dir"]]
+            #else:
+            #    ph = ph_fov[learner["pos"]]
+            #
+            #for f in ph:
+            #    pygame.draw.rect(
+            #        self.screen,
+            #        WHITE,
+            #        pygame.Rect(
+            #            f[0] - self.offset,
+            #            f[1] - self.offset,
+            #            self.patch_size,
+            #            self.patch_size
+            #        )
+            #    )
+                #text = self.chemical_font.render(str(learner["dir"]), True, BLACK)
+                #self.screen.blit(text, text.get_rect(center=p))
+
         # draw NON learners
         for turtle in turtles.values():
             pygame.draw.circle(self.screen, BLUE, (turtle['pos'][0], turtle['pos'][1]), self.turtle_size // 2)
@@ -1003,7 +1080,7 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "learner_population": 25,
+        "learner_population": 5,
         "actions": [
             #"move-toward-chemical",
             "random-walk",
@@ -1013,7 +1090,7 @@ def main():
             #"move-away-chemical"
         ],
         "sniff_threshold": 0.9,
-        "sniff_patches": 3, 
+        "sniff_patches": 5, 
         "diffuse_area": 0.5,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
@@ -1032,18 +1109,18 @@ def main():
         "penalty": -1,
         #"episode_ticks": 500,
         "episode_ticks": 1000,
-        #"W": 66,
+        #"W": 10,
         "W": 25,
-        #"H": 38,
+        #"H": 10,
         "H": 25,
         "PATCH_SIZE": 20,
-        #"PATCH_SIZE": 10,
+        #"PATCH_SIZE": 4,
         "TURTLE_SIZE": 16,
-        #"TURTLE_SIZE": 8,
+        #"TURTLE_SIZE": 3,
     }
 
     params_visualizer = {
-      "FPS": 15,
+      "FPS": 5,
       #"FPS": 3,
       "SHADE_STRENGTH": 10,
       "SHOW_CHEM_TEXT": True,
@@ -1052,16 +1129,17 @@ def main():
       "gui": True,
       "sniff_threshold": 0.9,
       "PATCH_SIZE": 20,
-      #"PATCH_SIZE": 10,
+      #"PATCH_SIZE": 4,
       "TURTLE_SIZE": 16,
-      #"TURTLE_SIZE": 8,
+      #"TURTLE_SIZE": 3,
+      "wiggle_patches": 3,
     }
 
     from tqdm import tqdm
 
     EPISODES = 50
     LOG_EVERY = 1
-    SEED = 0
+    SEED = 2
     np.random.seed(SEED)
     env = Slime(SEED, **params)
     env_vis = SlimeVisualizer(env.W_pixels, env.H_pixels, **params_visualizer)
@@ -1074,15 +1152,19 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=params["learner_population"]):
                 observation, reward, _ , _, info = env.last(agent)
-                #action = np.random.randint(0, ACTION_NUM)
+                action = np.random.randint(0, ACTION_NUM)
                 action = 1
                 #action = random.choice(actions)
                 env.step(action)
             env_vis.render(
                 env.patches,
                 env.learners,
-                env.turtles
+                env.turtles,
+                # For debugging
+                env.fov,
+                env.ph_fov
             )
+            breakpoint()
 
     print("Total time = ", time.time() - start_time)
     env.close()
