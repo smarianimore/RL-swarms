@@ -177,6 +177,11 @@ class Slime(AECEnv):
         # DOC {(x,y): [(x,y), ..., (x,y)]} pre-computed cluster-check for each patch, including itself
         self.cluster_patches = self._find_neighbours(self.cluster_radius)
 
+        # Agent's field of view
+        self.fov = self._field_of_view(self.wiggle_patches)
+        # Agent's pheromone field of view
+        self.ph_fov = self._field_of_view(self.smell_patches)
+
         self.actions = kwargs['actions']
         self._action_spaces = {
             a: Discrete(len(self.actions))
