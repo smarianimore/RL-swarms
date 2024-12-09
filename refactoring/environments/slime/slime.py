@@ -464,6 +464,16 @@ class Slime(AECEnv):
         elif self.obs_type == "variation_1":
             obs_id = int(f"{obs[0].astype(np.uint8)}{obs[1].astype(np.uint8)}", 2)
         return obs_id
+    
+    def convert_observation2(self, obs):
+        if self.obs_type == "paper":
+            if np.unique(obs).shape[0] == 1:
+                obs_id = np.random.randint(self.sniff_patches)
+            else:
+                obs_id = obs.argmax().item()
+        elif self.obs_type == "variation_1":
+            obs_id = int(f"{obs[0].astype(np.uint8)}{obs[1].astype(np.uint8)}", 2)
+        return obs_id
 
     def lay_pheromone(self, patches, pos):
         """
@@ -655,6 +665,14 @@ class Slime(AECEnv):
         patches[turtle['pos']]['turtles'].append(self.agent)
 
         return patches
+    
+    def follow_pheromone2(self, patches, ph_coords, turtle):
+        f, direction = self._get_new_positions(self.fov, turtle)
+        patches[turtle['pos']]['turtles'].remove(self.agent)
+        turtle["pos"] = ph_coords
+        patches[turtle['pos']]['turtles'].append(self.agent)
+        turtle["dir"] = self._get_new_direction(f, direction, ph_coords)
+        return patches, turtle
 
     def _find_max_pheromone(self, pos):
         """
