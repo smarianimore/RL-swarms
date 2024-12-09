@@ -93,6 +93,7 @@ class Slime(AECEnv):
         self.population = kwargs['population']
         self.learner_population = kwargs['learner_population']
         self.sniff_threshold = kwargs['sniff_threshold']
+        self.sniff_patches = kwargs['sniff_patches']
         self.diffuse_area = kwargs['diffuse_area']
         self.smell_area = kwargs['smell_area']
         self.lay_area = kwargs['lay_area']
@@ -100,6 +101,7 @@ class Slime(AECEnv):
         self.evaporation = kwargs['evaporation']
         self.diffuse_mode = kwargs['diffuse_mode']
         self.follow_mode = kwargs['follow_mode']
+        self.wiggle_patches = kwargs['wiggle_patches'] 
         self.cluster_threshold = kwargs['cluster_threshold']
         self.cluster_radius = kwargs['cluster_radius']
         self.reward_type = kwargs['reward_type']
@@ -111,6 +113,8 @@ class Slime(AECEnv):
         self.H = kwargs['H']
         self.patch_size = kwargs['PATCH_SIZE']
         self.turtle_size = kwargs['TURTLE_SIZE']
+
+        self.N_DIRS = 8
 
         self.coords = []
         self.offset = self.patch_size // 2
@@ -925,10 +929,12 @@ def main():
             #"move-away-chemical"
         ],
         "sniff_threshold": 0.9,
+        "sniff_patches": 3, 
         "diffuse_area": 0.5,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
         "follow_mode": "prob",
+        "wiggle_patches": 3,
         "smell_area": 1,
         "lay_area": 0,
         "lay_amount": 3,

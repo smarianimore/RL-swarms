@@ -7,9 +7,11 @@
         "move-toward-chemical"
     ],
     "sniff_threshold": 0.9,
+    "sniff_patches": 3, 
     "diffuse_area": 1.0,
     "diffuse_mode": "gaussian",
     "follow_mode": "det",
+    "wiggle_patches": 3,
     "smell_area": 1,
     "lay_area": 0,
     "lay_amount": 3,
