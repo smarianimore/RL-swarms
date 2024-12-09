@@ -258,8 +258,6 @@ if __name__ == "__main__":
     )
     
     parser.add_argument("--train", type=bool, default=False, required=False)
-    #parser.add_argument("--train", type=bool, choices=[True, False], required=True)
-
 
     parser.add_argument("--random_seed", type=int, default=42, required=False)
     

@@ -12,7 +12,7 @@
     "follow_mode": "det",
     "smell_area": 1,
     "lay_area": 0,
-    "lay_amount": 5,
+    "lay_amount": 3,
     "evaporation": 0.95,
     "cluster_threshold": 15,
     "cluster_radius": 3,
