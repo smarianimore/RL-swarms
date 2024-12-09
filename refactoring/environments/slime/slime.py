@@ -188,7 +188,7 @@ class Slime(AECEnv):
         # This array indicates the pheromone values in the 8 patches around the agent.
         if self.obs_type == "paper":
             self._observation_spaces = {
-                a: Box(low=0.0, high=np.inf, shape=(8,), dtype=np.float32)
+                a: Box(low=0.0, high=np.inf, shape=(self.wiggle_patches,), dtype=np.float32)
                 for a in self.possible_agents
             }
         elif self.obs_type == "variation_1":
@@ -811,16 +811,8 @@ class Slime(AECEnv):
             self.patches[p]['chemical'] = 0.0
 
         if self.obs_type == "paper":
-            #self.observations = {
-            #    a: np.array(self.learners[int(a)]['pos'])
-            #    for a in self.agents
-            #}
-            #self.observations = {
-            #    a: np.random.randint(8, dtype=np.int32)
-            #    for a in self.agents
-            #}
             self.observations = {
-                a: np.zeros(8, dtype=np.float32)
+                a: np.zeros(self.wiggle_patches, dtype=np.float32)
                 for a in self.agents
             }
         elif self.obs_type == "variation_1":
