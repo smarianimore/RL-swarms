@@ -392,6 +392,17 @@ class Slime(AECEnv):
         return turtles, patches 
     """
 
+    def _get_new_positions(self, possible_patches, agent):
+        pos = agent["pos"]
+        direction = agent["dir"]
+        return possible_patches[pos][direction]
+
+    def _get_new_direction(self, f, n_patches, old_dir, new_pos):
+        start = (old_dir - (n_patches // 2)) % self.N_DIRS 
+        idx_dir = np.where(np.all(f == new_pos, axis=1))[0].item()
+        new_dirs = [(i + start) % self.N_DIRS for i in range(n_patches)]
+        return new_dirs[idx_dir]
+
     def process_agent(self, cluster_ticks, rewards_cust):
         """
         In this methods we compute the agent's reward and it's observation.
@@ -421,17 +432,6 @@ class Slime(AECEnv):
 
         return observations, cluster_ticks, rewards_cust
 
-    '''
-    def get_obs(self, pos):
-        obs_patches = [
-            self._wrap(r, c)
-            for r in range(pos[0] - self.patch_size, pos[0] + 2 * self.patch_size, self.patch_size)
-            for c in range(pos[1] - self.patch_size, pos[1] + 2 * self.patch_size, self.patch_size)
-        ]
-        obs_patches.remove(pos)
-        return np.array([self.patches[o]["chemical"] for o in obs_patches])
-    '''
-
     def _get_obs(self, pos):
         """
         This method return the observation give by the env.
@@ -445,6 +445,11 @@ class Slime(AECEnv):
         field_of_view.remove(pos)
         obs = np.array([self.patches[f]["chemical"] for f in field_of_view])
         return obs 
+
+    def _get_obs2(self, agent):
+        f = self._get_new_positions(self.sniff_patches, agent)
+        obs = np.array([self.patches[tuple(i)]["chemical"] for i in f])
+        return obs
 
     def convert_observation(self, obs):
         """
