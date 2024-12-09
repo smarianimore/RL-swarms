@@ -115,6 +115,18 @@ class Slime(AECEnv):
         self.turtle_size = kwargs['TURTLE_SIZE']
 
         self.N_DIRS = 8
+        # Used to calculate the agent's directions.
+        # It's a personal convention.
+        self.movements = np.array([
+            (0, self.patch_size),
+            (self.patch_size, self.patch_size),
+            (self.patch_size, 0),
+            (self.patch_size, -self.patch_size),
+            (0, -self.patch_size),
+            (-self.patch_size, -self.patch_size),
+            (-self.patch_size, 0),
+            (-self.patch_size, self.patch_size),
+        ])
 
         self.coords = []
         self.offset = self.patch_size // 2
@@ -131,7 +143,12 @@ class Slime(AECEnv):
 
         n_coords = len(self.coords)
         # create learners turtle
-        self.learners = {i: {"pos": self.coords[np.random.randint(n_coords)]} for i in range(self.population, pop_tot)}
+        self.learners = {
+            i: {
+                "pos": self.coords[np.random.randint(n_coords)],
+                "dir": np.random.randint(self.N_DIRS) 
+            } for i in range(self.population, pop_tot)
+        }
         # create NON learner turtles
         self.turtles = {i: {"pos": self.coords[np.random.randint(n_coords)]} for i in range(self.population)}
 
