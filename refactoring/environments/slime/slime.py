@@ -204,6 +204,35 @@ class Slime(AECEnv):
             zip(self.possible_agents, list(range(self.population, pop_tot)))
         )
 
+    def _field_of_view(self, n_patches):
+        # Pre-compute every possible agent's direction
+        fov = {}
+        
+        if n_patches < self.N_DIRS:
+            central = n_patches // 2
+            sliding_window = []
+            
+            for i in range(self.N_DIRS):
+                tmp = []
+                for j in range(n_patches):
+                    tmp.append((i + j) % self.N_DIRS)
+                sliding_window.append(tmp)
+            sliding_window = sorted(sliding_window, key=lambda x: x[central])
+            
+            for c in self.coords:
+                tmp_fov = self.movements + c
+                tmp_fov[:, 0] %= self.W_pixels 
+                tmp_fov[:, 1] %= self.H_pixels 
+                fov[c] = tmp_fov[sliding_window, :]
+        else:
+            for c in self.coords:
+                tmp_fov = self.movements + c
+                tmp_fov[:, 0] %= self.W_pixels 
+                tmp_fov[:, 1] %= self.H_pixels 
+                fov[c] = tmp_fov
+
+        return fov
+
     def _find_neighbours_cascade(self, area: int):
         """
         For each patch, find neighbouring patches within square radius 'area', 1 step at a time
