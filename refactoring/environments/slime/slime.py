@@ -123,16 +123,6 @@ class Slime(AECEnv):
         ), "Error! wiggle_patches admitted values are: 1, 3, 5, 7, 8."
         # Used to calculate the agent's directions.
         # It's a personal convention.
-        #self.movements = np.array([
-        #    (0, self.patch_size),                   # dir 0
-        #    (self.patch_size, self.patch_size),     # dir 1
-        #    (self.patch_size, 0),                   # dir 2
-        #    (self.patch_size, -self.patch_size),    # dir 3
-        #    (0, -self.patch_size),                  # dir 4
-        #    (-self.patch_size, -self.patch_size),   # dir 5
-        #    (-self.patch_size, 0),                  # dir 6
-        #    (-self.patch_size, self.patch_size),    # dir 7
-        #])
         self.movements = np.array([
             (0, -self.patch_size),                  # dir 0
             (self.patch_size, -self.patch_size),    # dir 1
@@ -347,7 +337,8 @@ class Slime(AECEnv):
         )
         
         if action == 0:     # Walk
-            self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
         elif action == 1:   # Lay pheromone
             self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
         elif action == 2:   # Follow pheromone
@@ -411,11 +402,13 @@ class Slime(AECEnv):
     def _get_new_positions(self, possible_patches, agent):
         pos = agent["pos"]
         direction = agent["dir"]
-        return possible_patches[pos][direction], direction
-
-    def _get_new_direction(self, f, n_patches, old_dir, new_pos):
+        if len(possible_patches[pos].shape) > 2:
+            return possible_patches[pos][direction], direction
+        else:
+            return possible_patches[pos], direction
+    
+    def _get_new_direction(self, n_patches, old_dir, idx_dir):
         start = (old_dir - (n_patches // 2)) % self.N_DIRS 
-        idx_dir = np.where(np.all(f == new_pos, axis=1))[0].item()
         new_dirs = np.array([(i + start) % self.N_DIRS for i in range(n_patches)])
         return new_dirs[idx_dir]
 
@@ -441,7 +434,8 @@ class Slime(AECEnv):
         if self.obs_type == "paper":
             #_, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
             #observations = np.array(max_coords)
-            observations = self._get_obs(self.learners[self.agent]['pos'])
+            #observations = self._get_obs(self.learners[self.agent]['pos'])
+            observations = self._get_obs2(self.learners[self.agent])
         elif self.obs_type == "variation_1":
             chemical = self._check_chemical(self.agent)
             observations = np.array([cluster >= self.cluster_threshold, chemical])
@@ -596,12 +590,14 @@ class Slime(AECEnv):
     
     def walk2(self, patches, turtle):
         f, direction = self._get_new_positions(self.fov, turtle)
-        rng = np.random.default_rng()
-        new_turtle_pos = rng.choice(f)
+        idx_dir = np.random.randint(f.shape[0])
         patches[turtle['pos']]['turtles'].remove(self.agent)
-        turtle["pos"] = tuple(new_turtle_pos)
+        turtle["pos"] = tuple(f[idx_dir])
         patches[turtle['pos']]['turtles'].append(self.agent)
-        turtle["dir"] = self._get_new_direction(f, self.wiggle_patches, direction, new_turtle_pos)
+        if self.wiggle_patches < self.N_DIRS:
+            turtle["dir"] = self._get_new_direction(self.wiggle_patches, direction, idx_dir)
+        else:
+            turtle["dir"] = idx_dir
         return patches, turtle
 
     def run_away_pheromone(self, patches, ph_coords, turtle):
@@ -1080,9 +1076,9 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "learner_population": 5,
+        "learner_population": 1,
         "actions": [
-            #"move-toward-chemical",
+            "move-toward-chemical",
             "random-walk",
             "drop-chemical",
             #"move-and-drop",
@@ -1095,7 +1091,7 @@ def main():
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
         "follow_mode": "prob",
-        "wiggle_patches": 3,
+        "wiggle_patches": 8,
         "smell_area": 1,
         "lay_area": 0,
         "lay_amount": 3,
@@ -1120,7 +1116,7 @@ def main():
     }
 
     params_visualizer = {
-      "FPS": 5,
+      "FPS": 1,
       #"FPS": 3,
       "SHADE_STRENGTH": 10,
       "SHOW_CHEM_TEXT": True,
@@ -1132,7 +1128,7 @@ def main():
       #"PATCH_SIZE": 4,
       "TURTLE_SIZE": 16,
       #"TURTLE_SIZE": 3,
-      "wiggle_patches": 3,
+      "wiggle_patches": 8,
     }
 
     from tqdm import tqdm
@@ -1152,8 +1148,9 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=params["learner_population"]):
                 observation, reward, _ , _, info = env.last(agent)
-                action = np.random.randint(0, ACTION_NUM)
-                action = 1
+                #action = np.random.randint(0, ACTION_NUM)
+                #action = 1
+                action = 0
                 #action = random.choice(actions)
                 env.step(action)
             env_vis.render(
@@ -1164,7 +1161,7 @@ def main():
                 env.fov,
                 env.ph_fov
             )
-            breakpoint()
+            #breakpoint()
 
     print("Total time = ", time.time() - start_time)
     env.close()
