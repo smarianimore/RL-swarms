@@ -342,11 +342,22 @@ class Slime(AECEnv):
         elif action == 1:   # Lay pheromone
             self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
         elif action == 2:   # Follow pheromone
-            max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+            #max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
+                self.learners[self.agent],
+                self.observations[str(self.agent)]       
+            )
             if max_pheromone >= self.sniff_threshold:
-                self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+                #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.follow_pheromone2(
+                    self.patches,
+                    max_coords,
+                    max_ph_dir,
+                    self.learners[self.agent]
+                )
             else:
-                self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+                #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
         elif action == 3:   # Don't follow pheromone
             max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
             if max_pheromone >= self.sniff_threshold:
@@ -678,12 +689,11 @@ class Slime(AECEnv):
 
         return patches
     
-    def follow_pheromone2(self, patches, ph_coords, turtle):
-        f, direction = self._get_new_positions(self.fov, turtle)
+    def follow_pheromone2(self, patches, ph_coords, ph_dir, turtle):
         patches[turtle['pos']]['turtles'].remove(self.agent)
         turtle["pos"] = ph_coords
         patches[turtle['pos']]['turtles'].append(self.agent)
-        turtle["dir"] = self._get_new_direction(f, self.sniff_patches, direction, ph_coords)
+        turtle["dir"] = ph_dir
         return patches, turtle
 
     def _find_max_pheromone(self, pos):
@@ -720,7 +730,10 @@ class Slime(AECEnv):
         idx = obs.argmax().item()
         ph_val = obs[idx]
         ph_pos = tuple(f[idx])
-        ph_dir = self._get_new_direction(f, self.sniff_patches, direction, ph_pos)
+        if self.sniff_patches < self.N_DIRS:
+            ph_dir = self._get_new_direction(self.sniff_patches, direction, idx)
+        else:
+            ph_dir = idx
         return ph_val, ph_pos, ph_dir
 
     def _compute_cluster(self, current_agent):
@@ -1012,36 +1025,17 @@ class SlimeVisualizer:
         for learner in learners.values():
             pygame.draw.circle(self.screen, RED, (learner['pos'][0], learner['pos'][1]), self.turtle_size // 2)
 
-            if len(fov[learner["pos"]].shape) > 2:
-                view = fov[learner["pos"]][learner["dir"]]
-                dirs = self.dirs[learner["dir"]]
-            else:
-                view = fov[learner["pos"]]
-                dirs = self.dirs[4]
-
-            for f, d in zip(view, dirs):
-                pygame.draw.rect(
-                    self.screen,
-                    YELLOW,
-                    pygame.Rect(
-                        f[0] - self.offset,
-                        f[1] - self.offset,
-                        self.patch_size,
-                        self.patch_size
-                    )
-                )
-                text = self.cluster_font.render(str(d), True, BLACK)
-                self.screen.blit(text, text.get_rect(center=f))
-
-            #if len(ph_fov[learner["pos"]].shape) > 2:
-            #    ph = ph_fov[learner["pos"]][learner["dir"]]
+            #if len(fov[learner["pos"]].shape) > 2:
+            #    view = fov[learner["pos"]][learner["dir"]]
+            #    dirs = self.dirs[learner["dir"]]
             #else:
-            #    ph = ph_fov[learner["pos"]]
+            #    view = fov[learner["pos"]]
+            #    dirs = self.dirs[4]
             #
-            #for f in ph:
+            #for f, d in zip(view, dirs):
             #    pygame.draw.rect(
             #        self.screen,
-            #        WHITE,
+            #        YELLOW,
             #        pygame.Rect(
             #            f[0] - self.offset,
             #            f[1] - self.offset,
@@ -1049,8 +1043,35 @@ class SlimeVisualizer:
             #            self.patch_size
             #        )
             #    )
-                #text = self.chemical_font.render(str(learner["dir"]), True, BLACK)
-                #self.screen.blit(text, text.get_rect(center=p))
+            #    text = self.cluster_font.render(str(d), True, BLACK)
+            #    self.screen.blit(text, text.get_rect(center=f))
+
+            if len(ph_fov[learner["pos"]].shape) > 2:
+                ph = ph_fov[learner["pos"]][learner["dir"]]
+            else:
+                ph = ph_fov[learner["pos"]]
+            
+            for f in ph:
+                pygame.draw.rect(
+                    self.screen,
+                    WHITE,
+                    pygame.Rect(
+                        f[0] - self.offset,
+                        f[1] - self.offset,
+                        self.patch_size,
+                        self.patch_size
+                    )
+                )
+                if self.show_chem_text and (
+                    not sys.gettrace() is None or
+                    patches[learner["pos"]]['chemical'] >= self.sniff_threshold
+                ):  # if debugging show text everywhere, even 0
+                    text = self.chemical_font.render(
+                        str(round(patches[tuple(f)]['chemical'], 1)),
+                        True,
+                        BLACK
+                    )
+                    self.screen.blit(text, text.get_rect(center=f))
 
         # draw NON learners
         for turtle in turtles.values():
@@ -1076,7 +1097,7 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "learner_population": 1,
+        "learner_population": 2,
         "actions": [
             "move-toward-chemical",
             "random-walk",
@@ -1086,12 +1107,12 @@ def main():
             #"move-away-chemical"
         ],
         "sniff_threshold": 0.9,
-        "sniff_patches": 5, 
+        "sniff_patches": 3, 
         "diffuse_area": 0.5,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
         "follow_mode": "prob",
-        "wiggle_patches": 8,
+        "wiggle_patches": 3,
         "smell_area": 1,
         "lay_area": 0,
         "lay_amount": 3,
@@ -1104,7 +1125,7 @@ def main():
         "rew": 100,
         "penalty": -1,
         #"episode_ticks": 500,
-        "episode_ticks": 1000,
+        "episode_ticks": 500,
         #"W": 10,
         "W": 25,
         #"H": 10,
@@ -1148,9 +1169,9 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=params["learner_population"]):
                 observation, reward, _ , _, info = env.last(agent)
-                #action = np.random.randint(0, ACTION_NUM)
+                action = np.random.randint(0, ACTION_NUM)
                 #action = 1
-                action = 0
+                #action = 2
                 #action = random.choice(actions)
                 env.step(action)
             env_vis.render(
