@@ -358,22 +358,24 @@ class Slime(AECEnv):
             else:
                 #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
                 self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
-        elif action == 3:   # Don't follow pheromone
-            max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-            if max_pheromone >= self.sniff_threshold:
-                self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
-            else:
+            """
+            elif action == 3:   # Don't follow pheromone
+                max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+                if max_pheromone >= self.sniff_threshold:
+                    self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
+                else:
+                    self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            elif action == 4:   # Lay pheromone and walk
                 self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-        elif action == 4:   # Lay pheromone and walk
-            self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
-        elif action == 5:   # Lay pheromone and follow pheromone
-            max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-            if max_pheromone >= self.sniff_threshold:
-                self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
-            else:
-                self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+                self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+            elif action == 5:   # Lay pheromone and follow pheromone
+                max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+                if max_pheromone >= self.sniff_threshold:
+                    self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+                else:
+                    self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+                self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+            """
         else:
             raise ValueError("Action out of range!")
 
@@ -726,6 +728,7 @@ class Slime(AECEnv):
         return max_ph, winner
 
     def _find_max_pheromone2(self, agent, obs):
+        # Det = follow greatest pheromone
         f, direction = self._get_new_positions(self.ph_fov, agent)
         idx = obs.argmax().item()
         ph_val = obs[idx]
@@ -953,8 +956,8 @@ class SlimeVisualizer:
         self.show_chem_text = kwargs['SHOW_CHEM_TEXT']
         self.cluster_font_size = kwargs['CLUSTER_FONT_SIZE']
         self.chemical_font_size = kwargs['CHEMICAL_FONT_SIZE']
-        #self.sniff_threshold = kwargs['sniff_threshold']
-        self.sniff_threshold = 0.0 
+        self.sniff_threshold = kwargs['sniff_threshold']
+        #self.sniff_threshold = 0.0 
         self.patch_size = kwargs['PATCH_SIZE']
         self.turtle_size = kwargs['TURTLE_SIZE']
 
@@ -1025,26 +1028,27 @@ class SlimeVisualizer:
         for learner in learners.values():
             pygame.draw.circle(self.screen, RED, (learner['pos'][0], learner['pos'][1]), self.turtle_size // 2)
 
-            #if len(fov[learner["pos"]].shape) > 2:
-            #    view = fov[learner["pos"]][learner["dir"]]
-            #    dirs = self.dirs[learner["dir"]]
-            #else:
-            #    view = fov[learner["pos"]]
-            #    dirs = self.dirs[4]
-            #
-            #for f, d in zip(view, dirs):
-            #    pygame.draw.rect(
-            #        self.screen,
-            #        YELLOW,
-            #        pygame.Rect(
-            #            f[0] - self.offset,
-            #            f[1] - self.offset,
-            #            self.patch_size,
-            #            self.patch_size
-            #        )
-            #    )
-            #    text = self.cluster_font.render(str(d), True, BLACK)
-            #    self.screen.blit(text, text.get_rect(center=f))
+            """
+            if len(fov[learner["pos"]].shape) > 2:
+                view = fov[learner["pos"]][learner["dir"]]
+                dirs = self.dirs[learner["dir"]]
+            else:
+                view = fov[learner["pos"]]
+                dirs = self.dirs[4]
+            
+            for f, d in zip(view, dirs):
+                pygame.draw.rect(
+                    self.screen,
+                    YELLOW,
+                    pygame.Rect(
+                        f[0] - self.offset,
+                        f[1] - self.offset,
+                        self.patch_size,
+                        self.patch_size
+                    )
+                )
+                text = self.cluster_font.render(str(d), True, BLACK)
+                self.screen.blit(text, text.get_rect(center=f))
 
             if len(ph_fov[learner["pos"]].shape) > 2:
                 ph = ph_fov[learner["pos"]][learner["dir"]]
@@ -1072,6 +1076,7 @@ class SlimeVisualizer:
                         BLACK
                     )
                     self.screen.blit(text, text.get_rect(center=f))
+            """
 
         # draw NON learners
         for turtle in turtles.values():
@@ -1097,7 +1102,7 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "learner_population": 2,
+        "learner_population": 25,
         "actions": [
             "move-toward-chemical",
             "random-walk",
@@ -1116,7 +1121,7 @@ def main():
         "smell_area": 1,
         "lay_area": 0,
         "lay_amount": 3,
-        "evaporation": 1,
+        "evaporation": 0.95,
         "cluster_threshold": 30,
         "cluster_radius": 5,
         #"obs_type": "variation_1",
@@ -1137,7 +1142,7 @@ def main():
     }
 
     params_visualizer = {
-      "FPS": 1,
+      "FPS": 30,
       #"FPS": 3,
       "SHADE_STRENGTH": 10,
       "SHOW_CHEM_TEXT": True,
@@ -1149,18 +1154,18 @@ def main():
       #"PATCH_SIZE": 4,
       "TURTLE_SIZE": 16,
       #"TURTLE_SIZE": 3,
-      "wiggle_patches": 8,
+      "wiggle_patches": 3,
     }
 
     from tqdm import tqdm
 
-    EPISODES = 50
+    EPISODES = 5
     LOG_EVERY = 1
     SEED = 2
     np.random.seed(SEED)
     env = Slime(SEED, **params)
     env_vis = SlimeVisualizer(env.W_pixels, env.H_pixels, **params_visualizer)
-    #actions = [1, 3]
+    actions = [1, 2]
     ACTION_NUM = len(params["actions"])
 
     start_time = time.time()
@@ -1169,19 +1174,19 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=params["learner_population"]):
                 observation, reward, _ , _, info = env.last(agent)
-                action = np.random.randint(0, ACTION_NUM)
+                #action = np.random.randint(0, ACTION_NUM)
                 #action = 1
                 #action = 2
-                #action = random.choice(actions)
+                action = random.choice(actions)
                 env.step(action)
-            env_vis.render(
-                env.patches,
-                env.learners,
-                env.turtles,
-                # For debugging
-                env.fov,
-                env.ph_fov
-            )
+            #env_vis.render(
+            #    env.patches,
+            #    env.learners,
+            #    env.turtles,
+            #    # For debugging
+            #    env.fov,
+            #    env.ph_fov
+            #)
             #breakpoint()
 
     print("Total time = ", time.time() - start_time)
