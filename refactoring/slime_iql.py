@@ -264,6 +264,6 @@ if __name__ == "__main__":
     parser.add_argument("--render", type=bool, default=False, required=False)
     
     args = parser.parse_args()
-    print(f"{args}\n")
     if check_args(args):
+        print("Current args: ", args)
         main(args)

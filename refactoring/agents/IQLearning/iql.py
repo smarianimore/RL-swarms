@@ -126,7 +126,7 @@ def eval(
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', leave=False):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 state, reward, _, _, _ = env.last(agent)
-                s = env.convert_observation(state)
+                s = env.convert_observation2(state)
                 action = np.argmax(qtable[int(agent)][s])
                 env.step(action)
                 
