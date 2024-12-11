@@ -7,5 +7,6 @@
     "gui": true,
     "sniff_threshold": 0.9,
     "PATCH_SIZE": 20,
-    "TURTLE_SIZE": 16
+    "TURTLE_SIZE": 16,
+    "wiggle_patches": 3
 }

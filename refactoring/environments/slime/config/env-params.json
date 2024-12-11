@@ -8,7 +8,7 @@
     ],
     "sniff_threshold": 0.9,
     "sniff_patches": 3, 
-    "diffuse_area": 1.0,
+    "diffuse_area": 0.5,
     "diffuse_mode": "gaussian",
     "follow_mode": "det",
     "wiggle_patches": 3,
