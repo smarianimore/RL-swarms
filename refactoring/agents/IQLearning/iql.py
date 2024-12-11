@@ -34,8 +34,8 @@ def train(
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 cur_state, reward, _, _, _ = env.last(agent)
-                cur_s = env.convert_observation(cur_state)
-                
+                cur_s = env.convert_observation2(cur_state)
+
                 if ep == 1 and tick == 1:
                     #action = env.action_space(agent).sample()
                     action = np.random.randint(0, n_actions)
@@ -62,7 +62,9 @@ def train(
                 visualizer.render(
                     env.patches,
                     env.learners,
-                    env.turtles
+                    env.turtles,
+                    env.fov,
+                    env.ph_fov
                 )
         
         if decay_type == "log":
@@ -136,7 +138,9 @@ def eval(
                 visualizer.render(
                     env.patches,
                     env.learners,
-                    env.turtles
+                    env.turtles,
+                    env.fov,
+                    env.ph_fov
                 )
         
         if ep % test_log_every == 0:
