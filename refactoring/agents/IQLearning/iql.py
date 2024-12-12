@@ -27,6 +27,7 @@ def train(
     n_actions = env.actions_n()
     old_s = {}  # DOC old state for each agent {agent: old_state}
     old_a = {}
+    actions = [1, 2]
 
     for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
@@ -49,7 +50,11 @@ def train(
                         #action = env.action_space(agent).sample()
                     else:
                         action = np.argmax(qtable[int(agent)][cur_s])
-                env.step(action)
+
+                #print(actions[action])
+                #breakpoint()
+                env.step(actions[action])
+                #env.step(action)
 
                 old_s[agent] = cur_s
                 old_a[agent] = action
