@@ -125,6 +125,7 @@ def eval(
     #n_actions = env.actions_n()
 
     print("Start testing...\n")
+    actions = [1, 2]
     
     for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red', leave=False):
         env.reset()
@@ -133,7 +134,10 @@ def eval(
                 state, reward, _, _, _ = env.last(agent)
                 s = env.convert_observation2(state)
                 action = np.argmax(qtable[int(agent)][s])
-                env.step(action)
+                #env.step(action)
+                #print(actions[action])
+                #breakpoint()
+                env.step(actions[action])
                 
                 actions_dict[str(ep)][str(action)] += 1
                 action_dict[str(ep)][str(agent)][str(action)] += 1
