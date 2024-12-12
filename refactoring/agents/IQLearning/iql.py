@@ -1,4 +1,3 @@
-
 import random
 import numpy as np
 from tqdm import tqdm
@@ -27,7 +26,7 @@ def train(
     n_actions = env.actions_n()
     old_s = {}  # DOC old state for each agent {agent: old_state}
     old_a = {}
-    actions = [1, 2]
+    actions = [4, 5]
 
     for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
@@ -125,7 +124,7 @@ def eval(
     #n_actions = env.actions_n()
 
     print("Start testing...\n")
-    actions = [1, 2]
+    actions = [4, 5]
     
     for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red', leave=False):
         env.reset()
