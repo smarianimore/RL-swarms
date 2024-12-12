@@ -358,24 +358,34 @@ class Slime(AECEnv):
             else:
                 #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
                 self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
-            """
-            elif action == 3:   # Don't follow pheromone
-                max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-                if max_pheromone >= self.sniff_threshold:
-                    self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
-                else:
-                    self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-            elif action == 4:   # Lay pheromone and walk
+        elif action == 3:   # Don't follow pheromone
+            max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+            if max_pheromone >= self.sniff_threshold:
+                self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
+            else:
                 self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-                self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
-            elif action == 5:   # Lay pheromone and follow pheromone
-                max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-                if max_pheromone >= self.sniff_threshold:
-                    self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
-                else:
-                    self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-                self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
-            """
+        elif action == 4:   # Lay pheromone and walk
+            #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+        elif action == 5:   # Lay pheromone and follow pheromone
+            #max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
+                self.learners[self.agent],
+                self.observations[str(self.agent)]       
+            )
+            if max_pheromone >= self.sniff_threshold:
+                #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.follow_pheromone2(
+                    self.patches,
+                    max_coords,
+                    max_ph_dir,
+                    self.learners[self.agent]
+                )
+            else:
+                #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
         else:
             raise ValueError("Action out of range!")
 
@@ -1142,7 +1152,7 @@ def main():
     }
 
     params_visualizer = {
-      "FPS": 30,
+      "FPS": 5,
       #"FPS": 3,
       "SHADE_STRENGTH": 10,
       "SHOW_CHEM_TEXT": True,
@@ -1165,7 +1175,7 @@ def main():
     np.random.seed(SEED)
     env = Slime(SEED, **params)
     env_vis = SlimeVisualizer(env.W_pixels, env.H_pixels, **params_visualizer)
-    actions = [1, 2]
+    actions = [4, 5]
     ACTION_NUM = len(params["actions"])
 
     start_time = time.time()
@@ -1179,14 +1189,14 @@ def main():
                 #action = 2
                 action = random.choice(actions)
                 env.step(action)
-            #env_vis.render(
-            #    env.patches,
-            #    env.learners,
-            #    env.turtles,
-            #    # For debugging
-            #    env.fov,
-            #    env.ph_fov
-            #)
+            env_vis.render(
+                env.patches,
+                env.learners,
+                env.turtles,
+                # For debugging
+                env.fov,
+                env.ph_fov
+            )
             #breakpoint()
 
     print("Total time = ", time.time() - start_time)
