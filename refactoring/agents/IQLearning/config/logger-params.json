@@ -7,5 +7,5 @@
     "eval_params_file": "iql_eval_params",
     "eval_output_file": "iql_eval_output",
     "deep_algorithm": false,
-    "buffer_size": 9999
+    "buffer_size": 10000
 }

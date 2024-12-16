@@ -20,13 +20,14 @@ def train(
         logger,
         visualizer=None
     ):
-    # TRAINING
-    print("Start training...\n")
     
     n_actions = env.actions_n()
     old_s = {}  # DOC old state for each agent {agent: old_state}
     old_a = {}
     actions = [4, 5]
+    
+    # TRAINING
+    print("Start training...\n")
 
     for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
         env.reset()
@@ -52,8 +53,8 @@ def train(
 
                 #print(actions[action])
                 #breakpoint()
-                env.step(actions[action])
-                #env.step(action)
+                #env.step(actions[action])
+                env.step(action)
 
                 old_s[agent] = cur_s
                 old_a[agent] = action
@@ -133,10 +134,10 @@ def eval(
                 state, reward, _, _, _ = env.last(agent)
                 s = env.convert_observation2(state)
                 action = np.argmax(qtable[int(agent)][s])
-                #env.step(action)
+                env.step(action)
                 #print(actions[action])
                 #breakpoint()
-                env.step(actions[action])
+                #env.step(actions[action])
                 
                 actions_dict[str(ep)][str(action)] += 1
                 action_dict[str(ep)][str(agent)][str(action)] += 1

@@ -4,7 +4,7 @@
     "epsilon": 1.0,
     "epsilon_min": 0.01,
     "decay_type": "log",
-    "decay": 0.9995,
-    "train_episodes": 10000,
+    "decay": 0.99982,
+    "train_episodes": 20000,
     "test_episodes": 2000
 }
