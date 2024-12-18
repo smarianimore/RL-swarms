@@ -123,16 +123,6 @@ class Slime(AECEnv):
         ), "Error! wiggle_patches admitted values are: 1, 3, 5, 7, 8."
         # Used to calculate the agent's directions.
         # It's a personal convention.
-        self.movements = np.array([
-            (0, -self.patch_size),                  # dir 0
-            (self.patch_size, -self.patch_size),    # dir 1
-            (self.patch_size, 0),                   # dir 2
-            (self.patch_size, self.patch_size),     # dir 3
-            (0, self.patch_size),                   # dir 4
-            (-self.patch_size, self.patch_size),    # dir 5
-            (-self.patch_size, 0),                  # dir 6
-            (-self.patch_size, -self.patch_size),   # dir 7
-        ])
 
         self.coords = []
         self.offset = self.patch_size // 2
@@ -194,6 +184,7 @@ class Slime(AECEnv):
             for a in self.possible_agents
         }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
         
+        assert kwargs['obs_type'] in ("paper", "variation1", "variation2")
         self.obs_type = kwargs['obs_type']
         # DOC obervation is an array of 8 real elements.
         # This array indicates the pheromone values in the 8 patches around the agent.
@@ -202,7 +193,12 @@ class Slime(AECEnv):
                 a: Box(low=0.0, high=np.inf, shape=(self.sniff_patches,), dtype=np.float32)
                 for a in self.possible_agents
             }
-        elif self.obs_type == "variation_1":
+        elif self.obs_type == "variation1":
+            self._observation_spaces = {
+                a: Box(low=0.0, high=np.inf, shape=(self.sniff_patches + 1,), dtype=np.float32)
+                for a in self.possible_agents
+            }
+        elif self.obs_type == "variation2":
             self._observation_spaces = {
                 a: MultiBinary(2)
                 for a in self.possible_agents
@@ -217,6 +213,16 @@ class Slime(AECEnv):
 
     def _field_of_view(self, n_patches):
         # Pre-compute every possible agent's direction
+        movements = np.array([
+            (0, -self.patch_size),                  # dir 0
+            (self.patch_size, -self.patch_size),    # dir 1
+            (self.patch_size, 0),                   # dir 2
+            (self.patch_size, self.patch_size),     # dir 3
+            (0, self.patch_size),                   # dir 4
+            (-self.patch_size, self.patch_size),    # dir 5
+            (-self.patch_size, 0),                  # dir 6
+            (-self.patch_size, -self.patch_size),   # dir 7
+        ])
         fov = {}
         
         if n_patches < self.N_DIRS:
@@ -231,13 +237,13 @@ class Slime(AECEnv):
             sliding_window = sorted(sliding_window, key=lambda x: x[central])
             
             for c in self.coords:
-                tmp_fov = self.movements + c
+                tmp_fov = movements + c
                 tmp_fov[:, 0] %= self.W_pixels 
                 tmp_fov[:, 1] %= self.H_pixels 
                 fov[c] = tmp_fov[sliding_window, :]
         else:
             for c in self.coords:
-                tmp_fov = self.movements + c
+                tmp_fov = movements + c
                 tmp_fov[:, 0] %= self.W_pixels 
                 tmp_fov[:, 1] %= self.H_pixels 
                 fov[c] = tmp_fov
@@ -337,55 +343,39 @@ class Slime(AECEnv):
         )
         
         if action == 0:     # Walk
-            #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-            self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+            self.do_action0()
         elif action == 1:   # Lay pheromone
-            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+            self.do_action1()
         elif action == 2:   # Follow pheromone
-            #max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
-                self.learners[self.agent],
-                self.observations[str(self.agent)]       
-            )
-            if max_pheromone >= self.sniff_threshold:
-                #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
-                self.patches, self.learners[self.agent] = self.follow_pheromone2(
-                    self.patches,
-                    max_coords,
-                    max_ph_dir,
-                    self.learners[self.agent]
-                )
-            else:
-                #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+            self.do_action2()
         elif action == 3:   # Don't follow pheromone
-            max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-            if max_pheromone >= self.sniff_threshold:
-                self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
-            else:
-                self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-        elif action == 4:   # Lay pheromone and walk
+            self.do_action3()
+        elif action == 4:   # Walk and Lay pheromone
             #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-            self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
-            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
-        elif action == 5:   # Lay pheromone and follow pheromone
+            #self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+            #self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+            self.do_action0()
+            self.do_action1()
+        elif action == 5:   # Follow pheromone and Lay pheromone 
             #max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
-                self.learners[self.agent],
-                self.observations[str(self.agent)]       
-            )
-            if max_pheromone >= self.sniff_threshold:
-                #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
-                self.patches, self.learners[self.agent] = self.follow_pheromone2(
-                    self.patches,
-                    max_coords,
-                    max_ph_dir,
-                    self.learners[self.agent]
-                )
-            else:
-                #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
-            self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+            #max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
+            #    self.learners[self.agent],
+            #    self.observations[str(self.agent)]       
+            #)
+            #if max_pheromone >= self.sniff_threshold:
+            #    #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+            #    self.patches, self.learners[self.agent] = self.follow_pheromone2(
+            #        self.patches,
+            #        max_coords,
+            #        max_ph_dir,
+            #        self.learners[self.agent]
+            #    )
+            #else:
+            #    #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            #    self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+            #self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+            self.do_action2()
+            self.do_action1()
         else:
             raise ValueError("Action out of range!")
 
@@ -459,7 +449,9 @@ class Slime(AECEnv):
             #observations = np.array(max_coords)
             #observations = self._get_obs(self.learners[self.agent]['pos'])
             observations = self._get_obs2(self.learners[self.agent])
-        elif self.obs_type == "variation_1":
+        elif self.obs_type == "variation1":
+            observations = self._get_obs3(self.learners[self.agent])
+        elif self.obs_type == "variation2":
             chemical = self._check_chemical(self.agent)
             observations = np.array([cluster >= self.cluster_threshold, chemical])
 
@@ -484,6 +476,62 @@ class Slime(AECEnv):
         obs = np.array([self.patches[tuple(i)]["chemical"] for i in f])
         return obs
 
+    def _get_obs3(self, agent):
+        f, _ = self._get_new_positions(self.ph_fov, agent)
+        obs = [self.patches[tuple(i)]["chemical"] for i in f]
+        obs.append(self.patches[agent["pos"]]["chemical"])
+        return np.array(obs)
+
+    def do_action0(self):
+        #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+        self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+
+    def do_action1(self):
+        self.patches = self.lay_pheromone(self.patches, self.learners[self.agent]['pos'])
+
+    def do_action2(self):
+        #max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+        if self.obs_type == "paper":
+            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
+                self.learners[self.agent],
+                self.observations[str(self.agent)]       
+            )
+            if max_pheromone >= self.sniff_threshold:
+                #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.follow_pheromone2(
+                    self.patches,
+                    max_coords,
+                    max_ph_dir,
+                    self.learners[self.agent]
+                )
+            else:
+                #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+        elif self.obs_type == "variation1":
+            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone3(
+                self.learners[self.agent],
+                self.observations[str(self.agent)]       
+            )
+            if max_pheromone >= self.sniff_threshold:
+                #self.patches = self.follow_pheromone(self.patches, max_coords, self.learners[self.agent])
+                if max_coords != self.learners[self.agent]["pos"]:
+                    self.patches, self.learners[self.agent] = self.follow_pheromone2(
+                        self.patches,
+                        max_coords,
+                        max_ph_dir,
+                        self.learners[self.agent]
+                    )
+            else:
+                #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+
+    def do_action3(self):
+        max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+        if max_pheromone >= self.sniff_threshold:
+            self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
+        else:
+            self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+
     def convert_observation(self, obs):
         """
         This method returns the conversion of the observation to an integer.
@@ -504,7 +552,12 @@ class Slime(AECEnv):
                 obs_id = np.random.randint(self.sniff_patches)
             else:
                 obs_id = obs.argmax().item()
-        elif self.obs_type == "variation_1":
+        elif self.obs_type == "variation1":
+            if np.unique(obs).shape[0] == 1:
+                obs_id = np.random.randint(self.sniff_patches + 1)
+            else:
+                obs_id = obs.argmax().item()
+        elif self.obs_type == "variation2":
             obs_id = int(f"{obs[0].astype(np.uint8)}{obs[1].astype(np.uint8)}", 2)
         return obs_id
 
@@ -749,6 +802,22 @@ class Slime(AECEnv):
             ph_dir = idx
         return ph_val, ph_pos, ph_dir
 
+    def _find_max_pheromone3(self, agent, obs):
+        # Det = follow greatest pheromone
+        idx = obs.argmax()
+        ph_val = obs[idx]
+        if idx == (obs.shape[0] - 1):
+            ph_pos = agent["pos"] 
+            ph_dir = agent["dir"]
+        else:
+            f, direction = self._get_new_positions(self.ph_fov, agent)
+            ph_pos = tuple(f[idx])
+            if self.sniff_patches < self.N_DIRS:
+                ph_dir = self._get_new_direction(self.sniff_patches, direction, idx)
+            else:
+                ph_dir = idx
+        return ph_val, ph_pos, ph_dir
+
     def _compute_cluster(self, current_agent):
         """
         Checks whether the learner turtle is within a cluster, given 'cluster_radius' and 'cluster_threshold'
@@ -928,7 +997,12 @@ class Slime(AECEnv):
                 a: np.zeros(self.sniff_patches, dtype=np.float32)
                 for a in self.agents
             }
-        elif self.obs_type == "variation_1":
+        elif self.obs_type == "variation1":
+            self.observations = {
+                a: np.zeros(self.sniff_patches + 1, dtype=np.float32)
+                for a in self.agents
+            }
+        elif self.obs_type == "variation2":
             self.observations = {a: np.full((2, ), False) for a in self.agents}
         
         self._agent_selector.reinit(self.agents)
@@ -1060,6 +1134,7 @@ class SlimeVisualizer:
                 text = self.cluster_font.render(str(d), True, BLACK)
                 self.screen.blit(text, text.get_rect(center=f))
 
+            ######
             if len(ph_fov[learner["pos"]].shape) > 2:
                 ph = ph_fov[learner["pos"]][learner["dir"]]
             else:
@@ -1112,7 +1187,7 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "learner_population": 25,
+        "learner_population": 2,
         "actions": [
             "move-toward-chemical",
             "random-walk",
@@ -1126,15 +1201,15 @@ def main():
         "diffuse_area": 0.5,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
-        "follow_mode": "prob",
+        "follow_mode": "det",
         "wiggle_patches": 3,
         "smell_area": 1,
         "lay_area": 0,
         "lay_amount": 3,
         "evaporation": 0.95,
-        "cluster_threshold": 30,
-        "cluster_radius": 5,
-        #"obs_type": "variation_1",
+        "cluster_threshold": 15,
+        "cluster_radius": 3,
+        #"obs_type": "variation1",
         "obs_type": "paper",
         "reward_type": "scatter",
         "rew": 100,
@@ -1152,7 +1227,7 @@ def main():
     }
 
     params_visualizer = {
-      "FPS": 5,
+      "FPS": 1,
       #"FPS": 3,
       "SHADE_STRENGTH": 10,
       "SHOW_CHEM_TEXT": True,
@@ -1184,10 +1259,10 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=params["learner_population"]):
                 observation, reward, _ , _, info = env.last(agent)
-                #action = np.random.randint(0, ACTION_NUM)
+                action = np.random.randint(0, ACTION_NUM)
                 #action = 1
-                #action = 2
-                action = random.choice(actions)
+                #action = 5
+                #action = random.choice(actions)
                 env.step(action)
             env_vis.render(
                 env.patches,

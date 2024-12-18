@@ -2,9 +2,8 @@
     "population": 0,
     "learner_population": 25,    
     "actions": [
-        "random-walk",
-        "drop-chemical",
-        "move-toward-chemical"
+        "walk-and-drop",
+        "move-and-drop"
     ],
     "sniff_threshold": 0.9,
     "sniff_patches": 3, 
@@ -18,7 +17,7 @@
     "evaporation": 0.95,
     "cluster_threshold": 15,
     "cluster_radius": 3,
-    "obs_type": "paper",
+    "obs_type": "variation1",
     "reward_type": "cluster",
     "rew": 100,
     "penalty": -1,
