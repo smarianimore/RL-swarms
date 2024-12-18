@@ -793,7 +793,15 @@ class Slime(AECEnv):
     def _find_max_pheromone2(self, agent, obs):
         # Det = follow greatest pheromone
         f, direction = self._get_new_positions(self.ph_fov, agent)
-        idx = obs.argmax().item()
+        if self.follow_mode == "prob": 
+            total = obs.sum()
+            if total == 0.0:
+                probs = np.ones_like(obs) / obs.shape[0]
+            else:
+                probs = obs / obs.sum()
+            idx = np.random.choice(np.arange(obs.shape[0]), p=probs)
+        else:
+            idx = obs.argmax()
         ph_val = obs[idx]
         ph_pos = tuple(f[idx])
         if self.sniff_patches < self.N_DIRS:
@@ -804,7 +812,15 @@ class Slime(AECEnv):
 
     def _find_max_pheromone3(self, agent, obs):
         # Det = follow greatest pheromone
-        idx = obs.argmax()
+        if self.follow_mode == "prob": 
+            total = obs.sum()
+            if total == 0.0:
+                probs = np.ones_like(obs) / obs.shape[0]
+            else:
+                probs = obs / obs.sum()
+            idx = np.random.choice(np.arange(obs.shape[0]), p=probs)
+        else:
+            idx = obs.argmax()
         ph_val = obs[idx]
         if idx == (obs.shape[0] - 1):
             ph_pos = agent["pos"] 
@@ -1040,8 +1056,8 @@ class SlimeVisualizer:
         self.show_chem_text = kwargs['SHOW_CHEM_TEXT']
         self.cluster_font_size = kwargs['CLUSTER_FONT_SIZE']
         self.chemical_font_size = kwargs['CHEMICAL_FONT_SIZE']
-        self.sniff_threshold = kwargs['sniff_threshold']
-        #self.sniff_threshold = 0.0 
+        #self.sniff_threshold = kwargs['sniff_threshold']
+        self.sniff_threshold = 0.0 
         self.patch_size = kwargs['PATCH_SIZE']
         self.turtle_size = kwargs['TURTLE_SIZE']
 
@@ -1201,7 +1217,8 @@ def main():
         "diffuse_area": 0.5,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
-        "follow_mode": "det",
+        #"follow_mode": "det",
+        "follow_mode": "prob",
         "wiggle_patches": 3,
         "smell_area": 1,
         "lay_area": 0,
@@ -1209,8 +1226,8 @@ def main():
         "evaporation": 0.95,
         "cluster_threshold": 15,
         "cluster_radius": 3,
-        #"obs_type": "variation1",
-        "obs_type": "paper",
+        "obs_type": "variation1",
+        #"obs_type": "paper",
         "reward_type": "scatter",
         "rew": 100,
         "penalty": -1,
@@ -1259,9 +1276,9 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=params["learner_population"]):
                 observation, reward, _ , _, info = env.last(agent)
-                action = np.random.randint(0, ACTION_NUM)
+                #action = np.random.randint(0, ACTION_NUM)
                 #action = 1
-                #action = 5
+                action = 5
                 #action = random.choice(actions)
                 env.step(action)
             env_vis.render(
