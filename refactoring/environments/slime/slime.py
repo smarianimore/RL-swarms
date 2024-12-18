@@ -925,7 +925,7 @@ class Slime(AECEnv):
 
         if self.obs_type == "paper":
             self.observations = {
-                a: np.zeros(self.wiggle_patches, dtype=np.float32)
+                a: np.zeros(self.sniff_patches, dtype=np.float32)
                 for a in self.agents
             }
         elif self.obs_type == "variation_1":
