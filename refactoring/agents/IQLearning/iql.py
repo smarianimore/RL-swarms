@@ -41,10 +41,13 @@ def train(
                     #action = env.action_space(agent).sample()
                     action = np.random.randint(0, n_actions)
                 else:
+                    # QTable update
                     old_value = qtable[int(agent), old_s[agent], old_a[agent]]
                     next_max = np.max(qtable[int(agent), cur_s])  # QUESTION: was with [action] too
                     new_value = (1 - alpha) * old_value + alpha * (reward + gamma * next_max)
                     qtable[int(agent), old_s[agent], old_a[agent]] = new_value
+                    
+                    # next_action
                     if random.uniform(0, 1) < epsilon:
                         action = np.random.randint(0, n_actions)
                         #action = env.action_space(agent).sample()
@@ -53,8 +56,8 @@ def train(
 
                 #print(actions[action])
                 #breakpoint()
-                env.step(actions[action])
-                #env.step(action)
+                #env.step(actions[action])
+                env.step(action)
 
                 old_s[agent] = cur_s
                 old_a[agent] = action
@@ -134,10 +137,10 @@ def eval(
                 state, reward, _, _, _ = env.last(agent)
                 s = env.convert_observation2(state)
                 action = np.argmax(qtable[int(agent)][s])
-                #env.step(action)
+                env.step(action)
                 #print(actions[action])
                 #breakpoint()
-                env.step(actions[action])
+                #env.step(actions[action])
                 
                 actions_dict[str(ep)][str(action)] += 1
                 action_dict[str(ep)][str(agent)][str(action)] += 1
