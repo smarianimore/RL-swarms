@@ -92,6 +92,7 @@ def train(
     old_s = {}  # DOC old state for each agent {agent: old_state}
     old_a = {}
     actions = [4, 5]
+    cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
     
     # TRAINING
     print("Start training...\n")
@@ -130,9 +131,10 @@ def train(
                 old_a[agent] = action
 
                 actions_dict[str(ep)][str(action)] += 1
-                action_dict[str(ep)][str(agent)][str(action)] += 1
+                #action_dict[str(ep)][str(agent)][str(action)] += 1
                 reward_dict[str(ep)][str(agent)] += round(reward, 2)
                 
+            cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
             if visualizer != None:
                 visualizer.render(
                     env.patches,
@@ -149,7 +151,7 @@ def train(
         
         if ep % train_log_every == 0:
             avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
-            avg_cluster = round(env.avg_cluster2(), 2)
+            avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
             eps = round(epsilon, 4)
             value = [ep, tick * ep, avg_cluster, avg_rew]
             value.extend(list(actions_dict[str(ep)].values()))
@@ -196,6 +198,7 @@ def eval(
 
     print("Start testing...\n")
     actions = [4, 5]
+    cluster_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
     
     for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red', leave=False):
         env.reset()
@@ -213,6 +216,7 @@ def eval(
                 action_dict[str(ep)][str(agent)][str(action)] += 1
                 reward_dict[str(ep)][str(agent)] += round(reward, 2)
             
+            cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
             if visualizer != None:
                 visualizer.render(
                     env.patches,
@@ -224,7 +228,7 @@ def eval(
         
         if ep % test_log_every == 0:
             avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
-            avg_cluster = round(env.avg_cluster2(), 2)
+            avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
             value = [ep, tick * ep, avg_cluster, avg_rew]
             value.extend(list(actions_dict[str(ep)].values()))
             logger.load_value(value)

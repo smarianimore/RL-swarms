@@ -24,6 +24,7 @@ def run(env, params, episodes, visualizer=None):
         }
         for ep in range(1, episodes + 1)
     }
+    cluster_dict = {str(ep): 0.0 for ep in range(1, episodes + 1)}
     avg_reward_dict = []
     avg_cluster_dict = []
 
@@ -40,6 +41,7 @@ def run(env, params, episodes, visualizer=None):
             
                 reward_dict[str(ep)][str(agent)] += round(reward, 2)
             
+            cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
             if visualizer != None:
                 visualizer.render(
                     env.patches,
@@ -51,7 +53,7 @@ def run(env, params, episodes, visualizer=None):
         
         avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
         avg_reward_dict.append(avg_rew)
-        avg_cluster = round(env.avg_cluster2(), 2)
+        avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
         avg_cluster_dict.append(avg_cluster)
 
     env.close()
