@@ -173,14 +173,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--learning_params_path",
         type=str,
-        default="agents/IQLearning/config/learning-params.json",
+        default="agents/ISARSA/config/learning-params.json",
         required=False
     )
     
     parser.add_argument(
         "--logger_params_path",
         type=str,
-        default="agents/IQLearning/config/logger-params.json",
+        default="agents/ISARSA/config/logger-params.json",
         required=False
     )
 
