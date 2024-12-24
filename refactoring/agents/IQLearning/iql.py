@@ -2,6 +2,73 @@ import random
 import numpy as np
 from tqdm import tqdm
 
+def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
+    population = params['population']
+    learner_population = params['learner_population']
+    episodes =  l_params["train_episodes"] if train else l_params["test_episodes"]
+    # DOC dict che tiene conto della frequenza di scelta delle action per ogni episodio {episode: {action: _, action: _, ...}}
+    # Actions:
+    #   0: random-walk 
+    #   1: drop-chemical 
+    #   2: move-toward-chemical 
+    #   3: move-away-chemical 
+    #   4: walk-and-drop 
+    #   5: move-and-drop
+    actions_dict = {
+        str(ep): {
+            str(ac): 0 
+            for ac in range(n_actions)
+        } for ep in range(1, episodes + 1)
+    }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
+    # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
+    action_dict = {
+        str(ep): {
+            str(ag): {
+                str(ac): 0 
+                for ac in range(n_actions)
+            } for ag in range(population, population + learner_population)
+        } for ep in range(1, episodes + 1)
+    }
+    # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
+    reward_dict = {
+        str(ep): {
+            str(ag): 0 
+            for ag in range(population, population + learner_population)
+        }
+        for ep in range(1, episodes + 1)
+    }
+
+    if train:
+        # Q-Learning
+        # Q_table
+        qtable = np.zeros([learner_population, n_obs, n_actions])
+        alpha = l_params["alpha"]  # DOC learning rate (0 learn nothing 1 learn suddenly)
+        gamma = l_params["gamma"]  # DOC discount factor (0 care only bout immediate rewards, 1 care only about future ones)
+        epsilon = l_params["epsilon"]  # DOC chance of random action
+        epsilon_min = l_params["epsilon_min"]  # DOC chance of random action
+        decay_type = l_params["decay_type"]  # DOC di quanto diminuisce epsilon ogni episode (e.g. 1500 episodes => decay = 0.9995)
+        decay = l_params["decay"]  # DOC di quanto diminuisce epsilon ogni episode (e.g. 1500 episodes => decay = 0.9995)
+        return (
+            qtable,
+            alpha,
+            gamma,
+            epsilon,
+            epsilon_min,
+            decay_type,
+            decay,
+            episodes,
+            actions_dict,
+            action_dict,
+            reward_dict,
+        )
+    else:
+        return (
+            episodes,
+            actions_dict,
+            action_dict,
+            reward_dict,
+        )
+
 def train(
         env, 
         params:dict, 
