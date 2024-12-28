@@ -89,14 +89,17 @@ class IDQN:
         self.optimizers[agent].step()
         return loss.item()
 
-    def train(self, train_episodes, train_log_every, seed, **params):
+    def train(self, train_episodes, train_log_every, use_gpu, seed, **params):
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.use_deterministic_algorithms(True)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if device == "cuda":
-            torch.backends.cudnn.deterministic = True 
+        if use_gpu:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if device == "cuda":
+                torch.backends.cudnn.deterministic = True 
+        else:
+            device = torch.device("cpu")
 
         replay_memories = {str(l): ReplayMemory(self.replay_memory_size) for l in self.env.learners}
         self._init_target_policies()
@@ -154,12 +157,12 @@ class IDQN:
                     reward_dict[str(ep)][str(agent)] += reward.item() 
 
                 cluster_dict[str(ep)] += round(self.env.avg_cluster2(), 2) 
-                #if self.vis != None:
-                #    self.vis.render(
-                #        self.env.patches,
-                #        self.env.learners,
-                #        self.env.turtles
-                #    )
+                if self.vis != None:
+                    self.vis.render(
+                        self.env.patches,
+                        self.env.learners,
+                        self.env.turtles
+                    )
             if len(replay_memories[agent]) > self.mini_bach_size:
                 if self.decay_type == "log":
                     #epsilon *= decay

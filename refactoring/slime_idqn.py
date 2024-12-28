@@ -48,7 +48,7 @@ def main(args):
         idqn = IDQN(env, env_vis, logger, **l_params)
         train_episodes = l_params["train_episodes"]
         train_start = datetime.datetime.now()
-        model = idqn.train(train_episodes, train_log_every, args.random_seed, **params)
+        model = idqn.train(train_episodes, train_log_every, args.gpu, args.random_seed, **params)
         train_end = datetime.datetime.now()
         logger.save_computation_time(train_end - train_start)
         print(f"Training time: {train_end - train_start}\n")
@@ -132,6 +132,8 @@ if __name__ == "__main__":
     )
     
     parser.add_argument("--train", type=bool, default=False, required=False)
+    
+    parser.add_argument("--gpu", type=bool, default=False, required=False)
 
     parser.add_argument("--random_seed", type=int, default=42, required=False)
     
