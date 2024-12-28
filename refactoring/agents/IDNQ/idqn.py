@@ -34,11 +34,10 @@ class ReplayMemory:
         return len(self.memory)
 
 class IDQN:
-    def __init__(self, env, visualizer, logger, **kwargs):
+    def __init__(self, env, visualizer, logger, use_gpu, seed, **kwargs):
         self.env = env
         self.vis = visualizer
         self.logger = logger
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.replay_memory_size = kwargs["replay_memory_size"]
         self.mini_bach_size = kwargs["mini_bach_size"]
         self.policy_sync_rate = kwargs["policy_sync_rate"]
@@ -49,6 +48,17 @@ class IDQN:
         self.decay_type = kwargs["decay_type"]
         self.learning_rate_a = kwargs["learning_rate_a"]
         self.discount_factor_g = kwargs["discount_factor_g"]
+
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        #torch.use_deterministic_algorithms(True)
+        if use_gpu:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if self.device == "cuda":
+                torch.backends.cudnn.deterministic = True 
+        else:
+            self.device = torch.device("cpu")
 
         self.obs_dim = env.observations_n()
         self.actions_dim = env.actions_n()
@@ -89,18 +99,7 @@ class IDQN:
         self.optimizers[agent].step()
         return loss.item()
 
-    def train(self, train_episodes, train_log_every, use_gpu, seed, **params):
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.use_deterministic_algorithms(True)
-        if use_gpu:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            if device == "cuda":
-                torch.backends.cudnn.deterministic = True 
-        else:
-            device = torch.device("cpu")
-
+    def train(self, train_episodes, train_log_every, **params):
         replay_memories = {str(l): ReplayMemory(self.replay_memory_size) for l in self.env.learners}
         self._init_target_policies()
         

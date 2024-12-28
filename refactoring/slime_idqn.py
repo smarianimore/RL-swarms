@@ -45,10 +45,10 @@ def main(args):
     
     if args.train:
         logger, train_log_every = create_logger(curdir, params, l_params, log_params, args.train)
-        idqn = IDQN(env, env_vis, logger, **l_params)
+        idqn = IDQN(env, env_vis, logger, args.gpu, args.random_seed, **l_params)
         train_episodes = l_params["train_episodes"]
         train_start = datetime.datetime.now()
-        model = idqn.train(train_episodes, train_log_every, args.gpu, args.random_seed, **params)
+        model = idqn.train(train_episodes, train_log_every, **params)
         train_end = datetime.datetime.now()
         logger.save_computation_time(train_end - train_start)
         print(f"Training time: {train_end - train_start}\n")
