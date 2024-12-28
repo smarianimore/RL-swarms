@@ -6,12 +6,16 @@ import gc
 from collections import deque
 import os
 import json
+import torch
 
 class Logger:
     def __init__(self, curdir: str, params: dict, l_params: dict, log_params: dict, train: bool, deep_algo: bool, buffer_size: int, weights_file=None):
         OUTPUT_FILE_EXTENSION = ".csv"
-        WEIGHTS_FILE_EXTENSION = ".npy"
+        WEIGHTS_FILE_EXTENSION = ".npy" if deep_algo == False else ".pth"
         PARAMS_FILE_EXTENSION = ".txt"
+
+        self.deep_algo = deep_algo
+
         mode = "train" if train else "eval"
         time_now = datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S")
 
@@ -45,16 +49,19 @@ class Logger:
                 self.weights_file = weights_file
 
         self._write_params(params, l_params, log_params, train)
-        self.metrics = tuple(self._get_metrics(params, train, deep_algo))
+        self.metrics = tuple(self._get_metrics(params, train))
         self.table = pd.DataFrame(columns=self.metrics)
         self.buffer_size = buffer_size
     
     def _get_weight_path(self, weights_dir, ext):
         if not os.path.isdir(weights_dir):
             raise FileNotFoundError(errno.ENOENT, "No such directory found", weights_dir)
-        weights_filename = [f for f in os.listdir(weights_dir) if os.path.isfile(os.path.join(weights_dir, f)) and f.endswith(ext)][-1]
+        weights_filename = sorted([f for f in os.listdir(weights_dir) if os.path.isfile(os.path.join(weights_dir, f)) and f.endswith(ext)])[-1]
         if len(weights_filename) == 0:
-            raise FileNotFoundError(errno.ENOENT, "No such weights file (.npy) found in", weights_dir)
+            if self.deep_algo:
+                raise FileNotFoundError(errno.ENOENT, "No such weights file (.pth) found in", weights_dir)
+            else:
+                raise FileNotFoundError(errno.ENOENT, "No such weights file (.npy) found in", weights_dir)
         weights_file = os.path.join(weights_dir, weights_filename)
         return weights_file
     '''
@@ -81,6 +88,7 @@ class Logger:
     '''
 
     def _write_params(self, params, l_params, log_params, train):
+        """
         # Q-Learning
         alpha = l_params["alpha"]  # DOC learning rate (0 learn nothing 1 learn suddenly)
         gamma = l_params["gamma"]  # DOC discount factor (0 care only bout immediate rewards, 1 care only about future ones)
@@ -94,10 +102,19 @@ class Logger:
         else:
             test_episodes = l_params["test_episodes"]
             test_log_every = log_params["test_log_every"]
+        """
 
         with open(self.params_file, 'w') as f:
             f.write(f"{json.dumps(params, indent=2)}\n")
             f.write("----------\n")
+            f.write(f"{json.dumps(l_params, indent=2)}\n")
+            f.write("----------\n")
+            f.write(f"{json.dumps(log_params, indent=2)}\n")
+            if not train:
+                f.write(f"weights_file = {self.weights_file}\n")
+            f.write("----------\n")
+
+            """
             if train:
                 f.write(f"TRAIN_EPISODES = {train_episodes}\n")
                 f.write(f"TRAIN_LOG_EVERY = {train_log_every}\n")
@@ -113,8 +130,9 @@ class Logger:
             f.write(f"decay_type = {decay_type}\n")
             f.write(f"decay = {decay}\n")
             f.write("----------\n")
-
-    def _get_metrics(self, params, train, deep_algo):
+            """
+            
+    def _get_metrics(self, params, train):
         metrics = [
             "Episode",
             "Tick",
@@ -129,9 +147,9 @@ class Logger:
         #            metrics.append(f"(learner {l})-{a}")
         if train:
             metrics.append("Epsilon")
-            if deep_algo:
+            if self.deep_algo:
                 metrics.append("Loss")
-                metrics.append("Learning rate")
+                #metrics.append("Learning rate")
         return metrics
     
     def load_values(self, values):
@@ -184,10 +202,16 @@ class Logger:
         return True
     
     def save_model(self, weights):
-        np.save(self.weights_file, weights)
+        if self.deep_algo:
+            torch.save(weights, self.weights_file)
+        else:
+            np.save(self.weights_file, weights)
 
     def load_model(self):
-        return np.load(self.weights_file)
+        if self.deep_algo:
+            return torch.load(self.weights_file)
+        else:
+            return np.load(self.weights_file)
     
     def empty_table(self):
         if self.table.shape[0] > 0:
