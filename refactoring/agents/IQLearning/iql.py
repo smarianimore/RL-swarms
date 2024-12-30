@@ -93,7 +93,9 @@ def train(
     old_a = {}
     actions = [4, 5]
     cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
-    
+    max_reward = params['rew'] + (((params['learner_population'] - 1) / params["cluster_threshold"]) * (params['rew'] ** 2))
+    best_reward = 0.0
+
     # TRAINING
     print("Start training...\n")
 
@@ -104,6 +106,7 @@ def train(
             for agent in env.agent_iter(max_iter=params['learner_population']):
                 cur_state, reward, _, _, _ = env.last(agent)
                 cur_s = env.convert_observation2(cur_state)
+                reward /= max_reward
 
                 if ep == 1 and tick == 1:
                     #action = env.action_space(agent).sample()
@@ -157,21 +160,13 @@ def train(
             value.extend(list(actions_dict[str(ep)].values()))
             value.append(eps)
             logger.load_value(value)
-            
-            #print(f"\nEPISODE: {ep}")
-            #print(f"\tEpsilon: {round(epsilon, 2)}")
-            #print("\tCluster metrics up to now:")
-            #print("\t  - avg cluster in this episode: ", cluster_dict[str(ep)])
-            #print("\t  - avg cluster: ", avg_cluster)
-            #print("\t  - avg cluster std: ", std_cluster)
-            #print("\t  - min cluster: ", min_cluster)
-            #print("\t  - max cluster: ", max_cluster)
-            #print("\tReward metrics up to now:")
-            #print("\t  - avg reward in this episode: ", avg_reward_dict[str(ep)])
-            #print("\t  - avg reward: ", avg_reward)
-            #print("\t  - avg reward std: ", std_reward)
-            #print("\t  - min reward: ", min_reward)
-            #print("\t  - max reward: ", max_reward)
+
+            if best_reward < avg_rew:
+                print("\nMetrics ")
+                print(" - cluster:", avg_cluster)
+                print(" - reward: ", avg_rew)
+                print(" - epsilon: ", eps)
+                best_reward = avg_rew
 
     logger.empty_table()
     env.close()
