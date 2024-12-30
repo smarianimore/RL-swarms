@@ -506,7 +506,8 @@ class Slime(AECEnv):
                 )
             else:
                 #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+                #self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+                self.do_action0()
         elif self.obs_type == "variation1":
             max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone3(
                 self.learners[self.agent],
@@ -523,14 +524,24 @@ class Slime(AECEnv):
                     )
             else:
                 #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
-                self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+                #self.patches, self.learners[self.agent] = self.walk2(self.patches, self.learners[self.agent])
+                self.do_action0()
 
     def do_action3(self):
-        max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
-        if max_pheromone >= self.sniff_threshold:
-            self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
+        #max_pheromone, max_coords = self._find_max_pheromone(self.learners[self.agent]['pos'])
+        if np.any(self.observations[str(self.agent)] >= self.sniff_threshold):
+            ph_pos, ph_dir = self._find_non_max_pheromone(self.learners[self.agent], self.observations[str(self.agent)])
+            self.patches, self.learners[self.agent] = self.avoid_pheromone(
+                self.patches,
+                ph_pos,
+                ph_dir,
+                self.learners[self.agent]
+            )
+        #if max_pheromone >= self.sniff_threshold:
+        #    #self.patches = self.run_away_pheromone(self.patches, max_coords, self.learners[self.agent])
         else:
-            self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            #self.patches, self.learners[self.agent] = self.walk(self.patches, self.learners[self.agent])
+            self.do_action0()
 
     def convert_observation(self, obs):
         """
@@ -719,6 +730,13 @@ class Slime(AECEnv):
         patches[turtle['pos']]['turtles'].append(self.agent)
 
         return patches
+    
+    def avoid_pheromone(self, patches, ph_coords, ph_dir, turtle):
+        patches[turtle['pos']]['turtles'].remove(self.agent)
+        turtle["pos"] = ph_coords
+        patches[turtle['pos']]['turtles'].append(self.agent)
+        turtle["dir"] = ph_dir
+        return patches, turtle
 
     def follow_pheromone(self, patches, ph_coords, turtle):
         """
@@ -833,6 +851,21 @@ class Slime(AECEnv):
             else:
                 ph_dir = idx
         return ph_val, ph_pos, ph_dir
+
+    def _find_non_max_pheromone(self, agent, obs):
+        f, direction = self._get_new_positions(self.ph_fov, agent)
+        ids = np.where(obs >= self.sniff_threshold)[0]
+        if ids.shape[0] == obs.shape[0]:
+            idx = obs.argmin()
+        else:
+            idx = np.random.choice(ids)
+        #ph_val = obs[idx]
+        ph_pos = tuple(f[idx])
+        if self.sniff_patches < self.N_DIRS:
+            ph_dir = self._get_new_direction(self.sniff_patches, direction, idx)
+        else:
+            ph_dir = idx
+        return ph_pos, ph_dir
 
     def _compute_cluster(self, current_agent):
         """
@@ -1218,8 +1251,8 @@ def main():
         "diffuse_area": 0.5,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
-        #"follow_mode": "det",
-        "follow_mode": "prob",
+        "follow_mode": "det",
+        #"follow_mode": "prob",
         "wiggle_patches": 3,
         "smell_area": 1,
         "lay_area": 0,
@@ -1227,8 +1260,8 @@ def main():
         "evaporation": 0.95,
         "cluster_threshold": 15,
         "cluster_radius": 3,
-        "obs_type": "variation1",
-        #"obs_type": "paper",
+        #"obs_type": "variation1",
+        "obs_type": "paper",
         "reward_type": "scatter",
         "rew": 100,
         "penalty": -1,
