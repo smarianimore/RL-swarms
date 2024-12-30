@@ -838,7 +838,8 @@ class Slime(AECEnv):
         """
         Checks whether the learner turtle is within a cluster, given 'cluster_radius' and 'cluster_threshold'
         """
-        cluster = 0
+        #cluster = 0
+        cluster = -1
         for p in self.cluster_patches[self.learners[current_agent]['pos']]:
             cluster += len(self.patches[p]['turtles'])
 
