@@ -71,6 +71,84 @@ class IDQN:
     def _init_target_policies(self):
         for t in self.target_policy_nets:
             self.target_policy_nets[t].load_state_dict(self.policy_nets[t].state_dict())
+    
+    def _get_log_data_structs(self, episodes, train, **params):
+        population = params['population']
+        learner_population = params["cluster_learners"] + params["scatter_learners"]
+
+        cluster_actions_dict = {
+            str(ep): {
+                str(ac): 0 
+                for ac in range(self.actions_dim)
+            } for ep in range(1, episodes + 1)
+        }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
+        # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
+        cluster_action_dict = {
+            str(ep): {
+                str(ag): {
+                    str(ac): 0 
+                    for ac in range(self.actions_dim)
+                } for ag in range(population, population + params["cluster_learners"])
+            } for ep in range(1, episodes + 1)
+        }
+        # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
+        cluster_reward_dict = {
+            str(ep): {
+                str(ag): 0 
+                for ag in range(population, population + params["cluster_learners"])
+            }
+            for ep in range(1, episodes + 1)
+        }
+        
+        scatter_actions_dict = {
+            str(ep): {
+                str(ac): 0 
+                for ac in range(self.actions_dim)
+            } for ep in range(1, episodes + 1)
+        }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
+        # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
+        scatter_action_dict = {
+            str(ep): {
+                str(ag): {
+                    str(ac): 0 
+                    for ac in range(self.actions_dim)
+                } for ag in range(population + params["cluster_learners"], learner_population)
+            } for ep in range(1, episodes + 1)
+        }
+        # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
+        scatter_reward_dict = {
+            str(ep): {
+                str(ag): 0 
+                for ag in range(population + params["cluster_learners"], learner_population)
+            }
+            for ep in range(1, episodes + 1)
+        }
+        
+        cluster_dict = {str(ep): 0.0 for ep in range(1, episodes + 1)}
+
+        if train:
+            loss_dict = {str(ep): {str(ag): 0 for ag in range(population, population + learner_population)} for ep in range(1, episodes + 1)}
+            return (
+                cluster_dict,
+                cluster_actions_dict,
+                cluster_action_dict,
+                cluster_reward_dict,
+                scatter_actions_dict,
+                scatter_action_dict,
+                scatter_reward_dict,
+                loss_dict
+            )
+        else:
+            return (
+                cluster_dict,
+                cluster_actions_dict,
+                cluster_action_dict,
+                cluster_reward_dict,
+                scatter_actions_dict,
+                scatter_action_dict,
+                scatter_reward_dict,
+            )
+
 
     def _select_action(self, agent, obs, epsilon):
         if random.random() < epsilon:
@@ -103,28 +181,31 @@ class IDQN:
         replay_memories = {str(l): ReplayMemory(self.replay_memory_size) for l in self.env.learners}
         self._init_target_policies()
         
+        (
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
+            loss_dict
+        ) = self._get_log_data_structs(train_episodes, True, **params)
+        
         epsilon = self.epsilon_init
-        population = params['population']
-        learner_population = params['learner_population']
-        actions_dict = {str(ep): {str(ac): 0 for ac in range(self.actions_dim)} for ep in range(1, train_episodes + 1)}  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
-        #action_dict = {str(ep): {str(ag): {str(ac): 0 for ac in range(n_actions)} for ag in range(population, population + learner_population)} for ep in range(1, train_episodes + 1)}
-        reward_dict = {str(ep): {str(ag): 0.0 for ag in range(population, population + learner_population)} for ep in range(1, train_episodes + 1)}
-        cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
-        loss_dict = {str(ep): {str(ag): 0 for ag in range(population, population + learner_population)} for ep in range(1, train_episodes + 1)}
         actions = torch.tensor([4, 5])
         old_obs = {}
         old_actions = {}
-
-        max_reward = params['rew'] + ((params['learner_population'] / params["cluster_threshold"]) * (params['rew'] ** 2))
+        AGENTS_NUM = self.env.cluster_learners + self.env.scatter_learners
 
         for ep in tqdm(range(1, train_episodes + 1), desc="EPISODES", colour='red', position=0, leave=False):
             self.env.reset()
             
             for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
-                for agent in self.env.agent_iter(max_iter=params["learner_population"]):
+                for agent in self.env.agent_iter(max_iter=AGENTS_NUM):
                     obs, reward, _ , _, _ = self.env.last(agent)
                     obs = torch.tensor(obs, dtype=torch.float, device=self.device)
-                    reward = torch.tensor((reward / max_reward), dtype=torch.float, device=self.device) 
+                    reward = torch.tensor(reward, dtype=torch.float, device=self.device) 
                     done = True if tick == params["episode_ticks"] else False
                     
                     if ep == 1 and tick == 1:
@@ -151,9 +232,14 @@ class IDQN:
                     old_obs[agent] = obs
                     old_actions[agent] = action
 
-                    actions_dict[str(ep)][str(action.item())] += 1
-                    #action_dict[str(ep)][str(agent)][str(action)] += 1
-                    reward_dict[str(ep)][str(agent)] += reward.item() 
+                    if self.env.learners[int(agent)]["mode"] == 'c':
+                        cluster_actions_dict[str(ep)][str(action.item())] += 1
+                        #cluster_action_dict[str(ep)][str(agent)][str(action)] += 1
+                        cluster_reward_dict[str(ep)][str(agent)] += reward.item()
+                    elif self.env.learners[int(agent)]["mode"] == 's': 
+                        scatter_actions_dict[str(ep)][str(action.item())] += 1
+                        #scatter_action_dict[str(ep)][str(agent)][str(action)] += 1
+                        scatter_reward_dict[str(ep)][str(agent)] += reward.item()
 
                 cluster_dict[str(ep)] += round(self.env.avg_cluster2(), 2) 
                 if self.vis != None:
@@ -170,19 +256,36 @@ class IDQN:
                     epsilon = max(epsilon - (1 - self.decay), self.epsilon_min)
 
             if ep % train_log_every == 0:
-                avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
                 avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
-                avg_loss = round((sum(loss_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
+                value = [ep, tick * ep, avg_cluster]
+                
+                if params["cluster_learners"] > 0:
+                    cluster_avg_rew = round((sum(cluster_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["cluster_learners"], 4)
+                else:
+                    cluster_avg_rew = 0.0
+                value.append(cluster_avg_rew)
+                value.extend(list(cluster_actions_dict[str(ep)].values()))
+
+                if params["scatter_learners"] > 0:
+                    scatter_avg_rew = round((sum(scatter_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["scatter_learners"], 4)
+                else:
+                    scatter_avg_rew = 0.0
+                value.append(scatter_avg_rew)
+                value.extend(list(scatter_actions_dict[str(ep)].values()))
+                
                 eps = round(epsilon, 4)
-                value = [ep, tick * ep, avg_cluster, avg_rew]
-                value.extend(list(actions_dict[str(ep)].values()))
                 value.append(eps)
+                
+                # Double loss??
+                avg_loss = round((sum(loss_dict[str(ep)].values()) / params["episode_ticks"]) / AGENTS_NUM, 2)
                 value.append(avg_loss)
+                
                 self.logger.load_value(value)
 
                 print("\nMetrics ")
                 print(" - cluster:", avg_cluster)
-                print(" - reward: ", avg_rew)
+                print(" - cluster_reward: ", cluster_avg_rew)
+                print(" - scatter_reward: ", scatter_avg_rew)
                 print(" - epsilon: ", eps)
                 print(" - loss: ", avg_loss)
 

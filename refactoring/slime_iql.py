@@ -60,9 +60,13 @@ def main(args):
             decay_type,
             decay,
             train_episodes,
-            actions_dict,
-            action_dict,
-            reward_dict,
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
         ) = iql.create_agent(params, l_params, n_obs, n_actions, args.train)
         logger, train_log_every = create_logger(curdir, params, l_params, log_params, args.train)
 
@@ -71,9 +75,13 @@ def main(args):
             env,
             params,
             qtable,
-            actions_dict,
-            action_dict,
-            reward_dict,
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
             train_episodes,
             train_log_every,
             alpha,
@@ -95,9 +103,13 @@ def main(args):
     else:
         (
             test_episodes,
-            actions_dict,
-            action_dict,
-            reward_dict,
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
         ) = iql.create_agent(params, l_params, n_obs, n_actions, args.train)
         logger, test_log_every = create_logger(curdir, params, l_params, log_params, args.train, args.qtable_path)
 
@@ -110,9 +122,13 @@ def main(args):
         iql.eval(
             env,
             params,
-            actions_dict,
-            action_dict,
-            reward_dict,
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
             test_episodes,
             qtable,
             test_log_every,

@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
     population = params['population']
-    learner_population = params['learner_population']
+    learner_population = params["cluster_learners"] + params["scatter_learners"]
     episodes =  l_params["train_episodes"] if train else l_params["test_episodes"]
     # DOC dict che tiene conto della frequenza di scelta delle action per ogni episodio {episode: {action: _, action: _, ...}}
     # Actions:
@@ -14,29 +14,55 @@ def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
     #   3: move-away-chemical 
     #   4: walk-and-drop 
     #   5: move-and-drop
-    actions_dict = {
+    cluster_actions_dict = {
         str(ep): {
             str(ac): 0 
             for ac in range(n_actions)
         } for ep in range(1, episodes + 1)
     }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
     # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
-    action_dict = {
+    cluster_action_dict = {
         str(ep): {
             str(ag): {
                 str(ac): 0 
                 for ac in range(n_actions)
-            } for ag in range(population, population + learner_population)
+            } for ag in range(population, population + params["cluster_learners"])
         } for ep in range(1, episodes + 1)
     }
     # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
-    reward_dict = {
+    cluster_reward_dict = {
         str(ep): {
             str(ag): 0 
-            for ag in range(population, population + learner_population)
+            for ag in range(population, population + params["cluster_learners"])
         }
         for ep in range(1, episodes + 1)
     }
+    
+    scatter_actions_dict = {
+        str(ep): {
+            str(ac): 0 
+            for ac in range(n_actions)
+        } for ep in range(1, episodes + 1)
+    }  # DOC 0 = walk, 1 = lay_pheromone, 2 = follow_pheromone
+    # DOC dict che tiene conto della frequenza di scelta delle action di ogni agent per ogni episodio {episode: {agent: {action: _, action: _, ...}}}
+    scatter_action_dict = {
+        str(ep): {
+            str(ag): {
+                str(ac): 0 
+                for ac in range(n_actions)
+            } for ag in range(population + params["cluster_learners"], learner_population)
+        } for ep in range(1, episodes + 1)
+    }
+    # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
+    scatter_reward_dict = {
+        str(ep): {
+            str(ag): 0 
+            for ag in range(population + params["cluster_learners"], learner_population)
+        }
+        for ep in range(1, episodes + 1)
+    }
+
+    cluster_dict = {str(ep): 0.0 for ep in range(1, episodes + 1)}
 
     if train:
         # Q-Learning
@@ -57,25 +83,37 @@ def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
             decay_type,
             decay,
             episodes,
-            actions_dict,
-            action_dict,
-            reward_dict,
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
         )
     else:
         return (
             episodes,
-            actions_dict,
-            action_dict,
-            reward_dict,
+            cluster_dict,
+            cluster_actions_dict,
+            cluster_action_dict,
+            cluster_reward_dict,
+            scatter_actions_dict,
+            scatter_action_dict,
+            scatter_reward_dict,
         )
 
 def train(
         env, 
         params:dict, 
         qtable, 
-        actions_dict:dict, 
-        action_dict:dict, 
-        reward_dict:dict, 
+        cluster_dict,
+        cluster_actions_dict,
+        cluster_action_dict,
+        cluster_reward_dict,
+        scatter_actions_dict,
+        scatter_action_dict,
+        scatter_reward_dict,
         train_episodes:int, 
         train_log_every, 
         alpha:float, 
@@ -92,7 +130,8 @@ def train(
     old_s = {}  # DOC old state for each agent {agent: old_state}
     old_a = {}
     actions = [4, 5]
-    cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
+    best_cluster_reward = 0.0
+    AGENTS_NUM = env.cluster_learners + env.scatter_learners
     
     # TRAINING
     print("Start training...\n")
@@ -101,7 +140,7 @@ def train(
         env.reset()
         
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
-            for agent in env.agent_iter(max_iter=params['learner_population']):
+            for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 cur_state, reward, _, _, _ = env.last(agent)
                 cur_s = env.convert_observation2(cur_state)
 
@@ -131,9 +170,14 @@ def train(
                 old_s[agent] = cur_s
                 old_a[agent] = action
 
-                actions_dict[str(ep)][str(action)] += 1
-                #action_dict[str(ep)][str(agent)][str(action)] += 1
-                reward_dict[str(ep)][str(agent)] += round(reward, 2)
+                if env.learners[int(agent)]["mode"] == 'c':
+                    cluster_actions_dict[str(ep)][str(action)] += 1
+                    #cluster_action_dict[str(ep)][str(agent)][str(action)] += 1
+                    cluster_reward_dict[str(ep)][str(agent)] += round(reward, 2)
+                elif env.learners[int(agent)]["mode"] == 's': 
+                    scatter_actions_dict[str(ep)][str(action)] += 1
+                    #scatter_action_dict[str(ep)][str(agent)][str(action)] += 1
+                    scatter_reward_dict[str(ep)][str(agent)] += round(reward, 2)
                 
             cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
             if visualizer != None:
@@ -151,28 +195,35 @@ def train(
             epsilon = max(epsilon - (1 - decay), epsilon_min)
         
         if ep % train_log_every == 0:
-            avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
             avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
-            eps = round(epsilon, 4)
-            value = [ep, tick * ep, avg_cluster, avg_rew]
-            value.extend(list(actions_dict[str(ep)].values()))
-            value.append(eps)
-            logger.load_value(value)
+            value = [ep, tick * ep, avg_cluster]
             
-            #print(f"\nEPISODE: {ep}")
-            #print(f"\tEpsilon: {round(epsilon, 2)}")
-            #print("\tCluster metrics up to now:")
-            #print("\t  - avg cluster in this episode: ", cluster_dict[str(ep)])
-            #print("\t  - avg cluster: ", avg_cluster)
-            #print("\t  - avg cluster std: ", std_cluster)
-            #print("\t  - min cluster: ", min_cluster)
-            #print("\t  - max cluster: ", max_cluster)
-            #print("\tReward metrics up to now:")
-            #print("\t  - avg reward in this episode: ", avg_reward_dict[str(ep)])
-            #print("\t  - avg reward: ", avg_reward)
-            #print("\t  - avg reward std: ", std_reward)
-            #print("\t  - min reward: ", min_reward)
-            #print("\t  - max reward: ", max_reward)
+            if params["cluster_learners"] > 0:
+                cluster_avg_rew = round((sum(cluster_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["cluster_learners"], 4)
+            else:
+                cluster_avg_rew = 0.0
+            value.append(cluster_avg_rew)
+            value.extend(list(cluster_actions_dict[str(ep)].values()))
+
+            if params["scatter_learners"] > 0:
+                scatter_avg_rew = round((sum(scatter_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["scatter_learners"], 4)
+            else:
+                scatter_avg_rew = 0.0
+            value.append(scatter_avg_rew)
+            value.extend(list(scatter_actions_dict[str(ep)].values()))
+            
+            eps = round(epsilon, 4)
+            value.append(eps)
+            
+            logger.load_value(value)
+
+            if best_cluster_reward < cluster_avg_rew:
+                print("\nMetrics ")
+                print(" - cluster:", avg_cluster)
+                print(" - cluster_reward: ", cluster_avg_rew)
+                print(" - scatter_reward: ", scatter_avg_rew)
+                print(" - epsilon: ", eps)
+                best_cluster_reward = cluster_avg_rew
 
     logger.empty_table()
     env.close()
@@ -185,9 +236,13 @@ def train(
 def eval(
         env,
         params:dict, 
-        actions_dict,
-        action_dict,
-        reward_dict,
+        cluster_dict,
+        cluster_actions_dict,
+        cluster_action_dict,
+        cluster_reward_dict,
+        scatter_actions_dict,
+        scatter_action_dict,
+        scatter_reward_dict,
         test_episodes:int,
         qtable,
         test_log_every:int,
@@ -199,12 +254,12 @@ def eval(
 
     print("Start testing...\n")
     actions = [4, 5]
-    cluster_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
+    AGENTS_NUM = env.cluster_learners + env.scatter_learners
     
     for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red', leave=False):
         env.reset()
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', leave=False):
-            for agent in env.agent_iter(max_iter=params['learner_population']):
+            for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 state, reward, _, _, _ = env.last(agent)
                 s = env.convert_observation2(state)
                 action = np.argmax(qtable[int(agent)][s])
@@ -213,9 +268,14 @@ def eval(
                 #breakpoint()
                 #env.step(actions[action])
                 
-                actions_dict[str(ep)][str(action)] += 1
-                action_dict[str(ep)][str(agent)][str(action)] += 1
-                reward_dict[str(ep)][str(agent)] += round(reward, 2)
+                if env.learners[int(agent)]["mode"] == 'c':
+                    cluster_actions_dict[str(ep)][str(action)] += 1
+                    #cluster_action_dict[str(ep)][str(agent)][str(action)] += 1
+                    cluster_reward_dict[str(ep)][str(agent)] += round(reward, 2)
+                elif env.learners[int(agent)]["mode"] == 's': 
+                    scatter_actions_dict[str(ep)][str(action)] += 1
+                    #scatter_action_dict[str(ep)][str(agent)][str(action)] += 1
+                    scatter_reward_dict[str(ep)][str(agent)] += round(reward, 2)
             
             cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
             if visualizer != None:
@@ -228,10 +288,23 @@ def eval(
                 )
         
         if ep % test_log_every == 0:
-            avg_rew = round((sum(reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["learner_population"], 2)
             avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
-            value = [ep, tick * ep, avg_cluster, avg_rew]
-            value.extend(list(actions_dict[str(ep)].values()))
+            value = [ep, tick * ep, avg_cluster]
+            
+            if params["cluster_learners"] > 0:
+                cluster_avg_rew = round((sum(cluster_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["cluster_learners"], 4)
+            else:
+                cluster_avg_rew = 0.0
+            value.append(cluster_avg_rew)
+            value.extend(list(cluster_actions_dict[str(ep)].values()))
+
+            if params["scatter_learners"] > 0:
+                scatter_avg_rew = round((sum(scatter_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["scatter_learners"], 4)
+            else:
+                scatter_avg_rew = 0.0
+            value.append(scatter_avg_rew)
+            value.extend(list(scatter_actions_dict[str(ep)].values()))
+            
             logger.load_value(value)
     
     logger.empty_table()

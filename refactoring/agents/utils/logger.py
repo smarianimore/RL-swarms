@@ -113,38 +113,26 @@ class Logger:
             if not train:
                 f.write(f"weights_file = {self.weights_file}\n")
             f.write("----------\n")
-
-            """
-            if train:
-                f.write(f"TRAIN_EPISODES = {train_episodes}\n")
-                f.write(f"TRAIN_LOG_EVERY = {train_log_every}\n")
-            else:
-                f.write(f"TEST_EPISODES = {test_episodes}\n")
-                f.write(f"TEST_LOG_EVERY = {test_log_every}\n")
-                f.write(f"weights_file = {self.weights_file}\n")
-            f.write("----------\n")
-            f.write(f"alpha = {alpha}\n")
-            f.write(f"gamma = {gamma}\n")
-            f.write(f"epsilon = {epsilon}\n")
-            f.write(f"epsilon_min = {epsilon_min}\n")
-            f.write(f"decay_type = {decay_type}\n")
-            f.write(f"decay = {decay}\n")
-            f.write("----------\n")
-            """
             
     def _get_metrics(self, params, train):
         metrics = [
             "Episode",
             "Tick",
             "Avg cluster X episode",
-            "Avg reward X episode", 
         ]
+
+        metrics.append("Cluster avg reward X episode") 
         for a in params["actions"]:
-            metrics.append(a)
+            metrics.append("Cluster " + a)
         #if not train:
         #    for l in range(params['population'], params['population'] + params['learner_population']):
         #        for a in params["actions"]:
         #            metrics.append(f"(learner {l})-{a}")
+        
+        metrics.append("Scatter avg reward X episode") 
+        for a in params["actions"]:
+            metrics.append("Scatter " + a)
+
         if train:
             metrics.append("Epsilon")
             if self.deep_algo:

@@ -1313,13 +1313,13 @@ def main():
     env_vis = SlimeVisualizer(env.W_pixels, env.H_pixels, **params_visualizer)
     actions = [4, 5]
     ACTION_NUM = len(params["actions"])
-    agents_num = env.cluster_learners + env.scatter_learners
+    AGENTS_NUM = env.cluster_learners + env.scatter_learners
 
     start_time = time.time()
     for ep in tqdm(range(1, EPISODES + 1), desc="Episode"):
         env.reset()
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
-            for agent in env.agent_iter(max_iter=agents_num):
+            for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 observation, reward, _ , _, info = env.last(agent)
                 #action = np.random.randint(0, ACTION_NUM)
                 #action = 1
