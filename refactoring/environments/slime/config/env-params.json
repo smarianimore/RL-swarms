@@ -1,6 +1,7 @@
 {
     "population": 0,
-    "learner_population": 25,    
+    "cluster_learners": 20,
+    "scatter_learners": 5,
     "actions": [
         "walk-and-drop",
         "move-and-drop"
@@ -8,6 +9,7 @@
     "sniff_threshold": 0.9,
     "sniff_patches": 3, 
     "diffuse_area": 0.5,
+    "diffuse_radius": 0,
     "diffuse_mode": "gaussian",
     "follow_mode": "det",
     "wiggle_patches": 3,
@@ -19,6 +21,7 @@
     "cluster_radius": 3,
     "obs_type": "variation1",
     "reward_type": "cluster",
+    "normalize_rewards": true,
     "rew": 100,
     "penalty": -1,
     "episode_ticks": 500,
