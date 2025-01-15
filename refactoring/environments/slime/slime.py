@@ -1062,7 +1062,7 @@ class Slime(AECEnv):
         if cluster >= self.cluster_threshold:
             cluster_ticks[self.agent] += 1
 
-        cur_reward = (cluster_ticks[self.agent] / self.episode_ticks) * self.penalty + \
+        cur_reward = (cluster_ticks[self.agent] / self.episode_ticks) * self.penalty - \
                      (cluster / self.cluster_threshold) * (self.penalty ** 2) + \
                      (((self.episode_ticks - cluster_ticks[self.agent]) / self.episode_ticks) * self.reward)
         if self.normalize_rewards:
