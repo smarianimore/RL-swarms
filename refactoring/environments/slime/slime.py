@@ -914,6 +914,46 @@ class Slime(AECEnv):
     #    avg_cluster_size = somma / len(cluster_sizes)
     #    return avg_cluster_size
     
+    def _compute_avg_cluster(self, clusters):
+        cluster_sum = 0
+        for cluster in clusters:
+            cluster_sum += len(cluster)
+
+        return cluster_sum / len(clusters)
+
+    def _get_double_agent_clusters(self, clusters):
+        only_cluster = []
+        only_scatter = []
+        mixed_cluster = []
+        mixed_scatter = []
+        
+        for cluster in clusters:
+            tmp_cluster = []
+            tmp_scatter = []
+            counter_cluster = True 
+            counter_scatter = True 
+            
+            for c in cluster:
+                if self.learners[c]["mode"] == 'c':
+                    tmp_cluster.append(c)
+                    
+                    if counter_cluster:
+                        mixed_cluster.append(cluster)
+                        counter_cluster = False
+                elif self.learners[c]["mode"] == 's':
+                    tmp_scatter.append(c)
+                    
+                    if counter_scatter:
+                        mixed_scatter.append(cluster)
+                        counter_scatter = False
+            if len(tmp_cluster) > 0:
+                only_cluster.append(tmp_cluster)
+            
+            if len(tmp_scatter) > 0:
+                only_scatter.append(tmp_scatter)
+        
+        return only_cluster, mixed_cluster, only_scatter, mixed_scatter
+
     def avg_cluster2(self):
         """
         Same compuation as avg_cluster.
@@ -938,12 +978,25 @@ class Slime(AECEnv):
                     cs.remove(cluster_sizes[j])
                 elif set2.issubset(set1) and cluster_sizes[i] in cs:
                     cs.remove(cluster_sizes[i])
+        
         # calcolo avg_cluster_size
-        cluster_sum = 0
-        for cluster in cs:
-            cluster_sum += len(cluster)
-        avg_cluster_size = cluster_sum / len(cs)
-        return avg_cluster_size
+        if self.cluster_learners == 0 or self.scatter_learners == 0:
+            avg_cluster_size = self._compute_avg_cluster(cs)
+            
+            return avg_cluster_size
+        else:
+            (
+                only_cluster,
+                mixed_cluster,
+                only_scatter,
+                mixed_scatter
+            ) = self._get_double_agent_clusters(cs)
+            avg_only_cluster = self._compute_avg_cluster(only_cluster)
+            avg_mixed_cluster = self._compute_avg_cluster(mixed_cluster)
+            avg_only_scatter = self._compute_avg_cluster(only_scatter)
+            avg_mixed_scatter = self._compute_avg_cluster(mixed_scatter)
+
+            return avg_only_cluster, avg_mixed_cluster, avg_only_scatter, avg_mixed_scatter
 
     def _check_chemical(self, current_agent):
         """
@@ -1242,29 +1295,29 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "cluster_learners": 5,
+        "cluster_learners": 0,
         "scatter_learners": 5,
         "actions": [
             "move-toward-chemical",
             "random-walk",
             "drop-chemical",
+            "move-away-chemical"
             #"move-and-drop",
             #"walk-and-drop",
-            #"move-away-chemical"
         ],
         "sniff_threshold": 0.9,
-        "sniff_patches": 3, 
+        "sniff_patches": 8, 
         "diffuse_area": 0.5,
         "diffuse_radius": 0,
         "diffuse_mode": "gaussian",
         #"diffuse_mode": "cascade",
         "follow_mode": "det",
         #"follow_mode": "prob",
-        "wiggle_patches": 3,
+        "wiggle_patches": 8,
         "smell_area": 1,
-        "lay_area": 0,
+        "lay_area": 1,
         "lay_amount": 3,
-        "evaporation": 0.95,
+        "evaporation": 0.90,
         "cluster_threshold": 15,
         "cluster_radius": 3,
         #"obs_type": "variation1",
@@ -1275,10 +1328,10 @@ def main():
         "penalty": -1,
         #"episode_ticks": 500,
         "episode_ticks": 500,
-        "W": 16,
-        #"W": 25,
-        "H": 16,
-        #"H": 25,
+        #"W": 16,
+        "W": 22,
+        #"H": 16,
+        "H": 22,
         "PATCH_SIZE": 20,
         #"PATCH_SIZE": 4,
         "TURTLE_SIZE": 16,
@@ -1321,19 +1374,20 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 observation, reward, _ , _, info = env.last(agent)
-                #action = np.random.randint(0, ACTION_NUM)
+                action = np.random.randint(0, ACTION_NUM)
                 #action = 1
-                action = 1
+                #action = 2
                 #action = random.choice(actions)
                 env.step(action)
-            env_vis.render(
-                env.patches,
-                env.learners,
-                # For debugging
-                env.fov,
-                env.ph_fov
-            )
+            #env_vis.render(
+            #    env.patches,
+            #    env.learners,
+            #    # For debugging
+            #    env.fov,
+            #    env.ph_fov
+            #)
             #breakpoint()
+        env.avg_cluster2()
 
     print("Total time = ", time.time() - start_time)
     env.close()

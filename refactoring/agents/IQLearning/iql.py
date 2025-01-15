@@ -132,6 +132,10 @@ def train(
     actions = [4, 5]
     best_cluster_reward = 0.0
     AGENTS_NUM = env.cluster_learners + env.scatter_learners
+    only_cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
+    mixed_cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
+    only_scatter_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
+    mixed_scatter_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
 
     # TRAINING
     print("Start training...\n")
@@ -178,7 +182,20 @@ def train(
                     #scatter_action_dict[str(ep)][str(agent)][str(action)] += 1
                     scatter_reward_dict[str(ep)][str(agent)] += round(reward, 2)
                 
-            cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
+            if env.cluster_learners == 0 or env.scatter_learners == 0:
+                cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
+            else:
+                (
+                    avg_only_cluster,
+                    avg_mixed_cluster,
+                    avg_only_scatter,
+                    avg_mixed_scatter
+                ) = env.avg_cluster2()
+                only_cluster_dict[str(ep)] += round(avg_only_cluster, 2)
+                mixed_cluster_dict[str(ep)] += round(avg_mixed_cluster, 2)
+                only_scatter_dict[str(ep)] += round(avg_only_scatter, 2)
+                mixed_scatter_dict[str(ep)] += round(avg_mixed_scatter, 2)
+            
             if visualizer != None:
                 visualizer.render(
                     env.patches,
@@ -194,8 +211,20 @@ def train(
             epsilon = max(epsilon - (1 - decay), epsilon_min)
         
         if ep % train_log_every == 0:
-            avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
-            value = [ep, tick * ep, avg_cluster]
+            value = [ep, tick * ep]
+            
+            if env.cluster_learners == 0 or env.scatter_learners == 0:
+                avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_cluster)
+            else:
+                avg_only_cluster = round(only_cluster_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_only_cluster)
+                avg_mixed_cluster = round(mixed_cluster_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_mixed_cluster)
+                avg_only_scatter = round(only_scatter_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_only_scatter)
+                avg_mixed_scatter = round(mixed_scatter_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_mixed_scatter)
             
             if params["cluster_learners"] > 0:
                 cluster_avg_rew = round((sum(cluster_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["cluster_learners"], 4)
@@ -218,7 +247,13 @@ def train(
 
             if best_cluster_reward < cluster_avg_rew:
                 print("\nMetrics ")
-                print(" - cluster:", avg_cluster)
+                if env.cluster_learners == 0 or env.scatter_learners == 0:
+                    print(" - cluster: ", avg_cluster)
+                else:
+                    print(" - only_cluster: ", avg_only_cluster)
+                    print(" - mixed_cluster: ", avg_mixed_cluster)
+                    print(" - only_scatter: ", avg_only_scatter)
+                    print(" - mixed_scatter: ", avg_mixed_scatter)
                 print(" - cluster_reward: ", cluster_avg_rew)
                 print(" - scatter_reward: ", scatter_avg_rew)
                 print(" - epsilon: ", eps)
@@ -251,9 +286,14 @@ def eval(
     # DOC Evaluate agent's performance after Q-learning
     #n_actions = env.actions_n()
 
-    print("Start testing...\n")
     actions = [4, 5]
     AGENTS_NUM = env.cluster_learners + env.scatter_learners
+    only_cluster_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
+    mixed_cluster_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
+    only_scatter_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
+    mixed_scatter_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
+    
+    print("Start testing...\n")
     
     for ep in tqdm(range(1, test_episodes + 1), desc="EPISODES", colour='red', leave=False):
         env.reset()
@@ -276,19 +316,43 @@ def eval(
                     #scatter_action_dict[str(ep)][str(agent)][str(action)] += 1
                     scatter_reward_dict[str(ep)][str(agent)] += round(reward, 2)
             
-            cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
+            if env.cluster_learners == 0 or env.scatter_learners == 0:
+                cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
+            else:
+                (
+                    avg_only_cluster,
+                    avg_mixed_cluster,
+                    avg_only_scatter,
+                    avg_mixed_scatter
+                ) = env.avg_cluster2()
+                only_cluster_dict[str(ep)] += round(avg_only_cluster, 2)
+                mixed_cluster_dict[str(ep)] += round(avg_mixed_cluster, 2)
+                only_scatter_dict[str(ep)] += round(avg_only_scatter, 2)
+                mixed_scatter_dict[str(ep)] += round(avg_mixed_scatter, 2)
+
             if visualizer != None:
                 visualizer.render(
                     env.patches,
                     env.learners,
-                    env.turtles,
                     env.fov,
                     env.ph_fov
                 )
         
         if ep % test_log_every == 0:
-            avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
-            value = [ep, tick * ep, avg_cluster]
+            value = [ep, tick * ep]
+            
+            if env.cluster_learners == 0 or env.scatter_learners == 0:
+                avg_cluster = round(cluster_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_cluster)
+            else:
+                avg_only_cluster = round(only_cluster_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_only_cluster)
+                avg_mixed_cluster = round(mixed_cluster_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_mixed_cluster)
+                avg_only_scatter = round(only_scatter_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_only_scatter)
+                avg_mixed_scatter = round(mixed_scatter_dict[str(ep)] / params["episode_ticks"], 2)
+                value.append(avg_mixed_scatter)
             
             if params["cluster_learners"] > 0:
                 cluster_avg_rew = round((sum(cluster_reward_dict[str(ep)].values()) / params["episode_ticks"]) / params["cluster_learners"], 4)

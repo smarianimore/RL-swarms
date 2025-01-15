@@ -115,15 +115,23 @@ class Logger:
             f.write("----------\n")
             
     def _get_metrics(self, params, train):
-        metrics = [
-            "Episode",
-            "Tick",
-            "Avg cluster X episode",
-        ]
+        metrics = ["Episode", "Tick"]
+
+        if params["cluster_learners"] == 0 or params["scatter_learners"] == 0:
+            metrics.append("Avg cluster X episode")
+        else:
+            double_agent_metrics = [
+                "Avg only cluster X episode",
+                "Avg mixed cluster X episode",
+                "Avg only scatter X episode",
+                "Avg mixed scatter X episode"
+            ]
+            metrics.extend(double_agent_metrics)
 
         metrics.append("Cluster avg reward X episode") 
         for a in params["actions"]:
             metrics.append("Cluster " + a)
+
         #if not train:
         #    for l in range(params['population'], params['population'] + params['learner_population']):
         #        for a in params["actions"]:
