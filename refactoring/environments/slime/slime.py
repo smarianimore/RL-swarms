@@ -40,10 +40,7 @@ class Slime(AECEnv):
 
     metadata = {"render_modes": ["human", "server"]}
 
-    def __init__(self,
-                 seed,
-                 render_mode: Optional[str] = None,
-                 **kwargs):
+    def __init__(self, seed, render_mode: Optional[str] = None, **kwargs):
         """
         :param population:          Controls the number of non-learning slimes (= green turtles)
         :param sniff_threshold:     Controls how sensitive slimes are to pheromone (higher values make slimes less
@@ -104,11 +101,13 @@ class Slime(AECEnv):
         self.follow_mode = kwargs['follow_mode']
         self.cluster_threshold = kwargs['cluster_threshold']
         self.cluster_radius = kwargs['cluster_radius']
-        self.reward_type = kwargs['reward_type']
         self.normalize_rewards = kwargs['normalize_rewards']
-        self.reward = kwargs['rew']
-        self.penalty = kwargs['penalty']
         self.episode_ticks = kwargs['episode_ticks']
+    
+        self.cluster_reward = kwargs['cluster_rew']
+        self.cluster_penalty = kwargs['cluster_penalty']
+        self.scatter_reward = kwargs['scatter_rew']
+        self.scatter_penalty = kwargs['scatter_penalty']
 
         self.W = kwargs['W']
         self.H = kwargs['H']
@@ -204,7 +203,8 @@ class Slime(AECEnv):
                 for a in self.possible_agents
             }  # DOC [0] = whether the turtle is in a cluster [1] = whether there is chemical in turtle patch
 
-        self.REWARD_MAX = self.reward + (((self.cluster_learners - 1) / self.cluster_threshold) * (self.reward ** 2))
+        #self.REWARD_MAX = self.reward + (((self.cluster_learners - 1) / self.cluster_threshold) * (self.reward ** 2))
+        self.REWARD_MAX = self.cluster_reward + (((self.cluster_learners - 1) / self.cluster_threshold) * (self.cluster_reward ** 2))
 
         #Different from AECEnv attribute self.rewards - only keeps last step rewards
         #self.rewards_cust = {i: [] for i in range(self.population, pop_tot)}
@@ -433,14 +433,12 @@ class Slime(AECEnv):
         """
         cluster = self._compute_cluster(self.agent)
 
-        #if self.reward_type == "cluster":
         if self.learners[self.agent]["mode"] == 'c':
             cluster_ticks, rewards_cust, cur_reward = self.reward_cluster_and_time_punish_time(
                 cluster_ticks,
                 rewards_cust,
                 cluster
             )
-        #elif self.reward_type == "scatter":
         elif self.learners[self.agent]["mode"] == 's':
             cluster_ticks, rewards_cust, cur_reward = self.reward_scatter_and_time_punish_time(
                 cluster_ticks,
@@ -1046,9 +1044,9 @@ class Slime(AECEnv):
         if cluster >= self.cluster_threshold:
             cluster_ticks[self.agent] += 1
 
-        cur_reward = (cluster_ticks[self.agent] / self.episode_ticks) * self.reward + \
-                     (cluster / self.cluster_threshold) * (self.reward ** 2) + \
-                     (((self.episode_ticks - cluster_ticks[self.agent]) / self.episode_ticks) * self.penalty)
+        cur_reward = (cluster_ticks[self.agent] / self.episode_ticks) * self.cluster_reward + \
+                     (cluster / self.cluster_threshold) * (self.cluster_reward ** 2) + \
+                     (((self.episode_ticks - cluster_ticks[self.agent]) / self.episode_ticks) * self.cluster_penalty)
         if self.normalize_rewards:
             cur_reward = round(cur_reward / self.REWARD_MAX, 4)
 
@@ -1062,11 +1060,11 @@ class Slime(AECEnv):
         if cluster >= self.cluster_threshold:
             cluster_ticks[self.agent] += 1
 
-        cur_reward = (cluster_ticks[self.agent] / self.episode_ticks) * self.penalty - \
-                     (cluster / self.cluster_threshold) * (self.penalty ** 2) + \
-                     (((self.episode_ticks - cluster_ticks[self.agent]) / self.episode_ticks) * self.reward)
+        cur_reward = (cluster_ticks[self.agent] / self.episode_ticks) * self.scatter_penalty - \
+                     (cluster / self.cluster_threshold) * (self.scatter_penalty ** 2) + \
+                     (((self.episode_ticks - cluster_ticks[self.agent]) / self.episode_ticks) * self.scatter_reward)
         if self.normalize_rewards:
-            cur_reward = round(cur_reward / self.reward, 4)
+            cur_reward = round(cur_reward / self.scatter_reward, 4)
 
         rewards_cust[self.agent].append(cur_reward)
         return cluster_ticks, rewards_cust, cur_reward
@@ -1295,8 +1293,8 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "cluster_learners": 0,
-        "scatter_learners": 5,
+        "cluster_learners": 2,
+        "scatter_learners": 2,
         "actions": [
             "move-toward-chemical",
             "random-walk",
@@ -1322,12 +1320,13 @@ def main():
         "cluster_radius": 3,
         #"obs_type": "variation1",
         "obs_type": "paper",
-        "reward_type": "scatter",
-        "normalize_rewards": True,
-        "rew": 100,
-        "penalty": -1,
+        "normalize_rewards": False,
+        "cluster_rew": 10,
+        "cluster_penalty": 0,
+        "scatter_rew": 0,
+        "scatter_penalty": -10,
         #"episode_ticks": 500,
-        "episode_ticks": 500,
+        "episode_ticks": 5,
         #"W": 16,
         "W": 22,
         #"H": 16,
@@ -1360,7 +1359,7 @@ def main():
 
     EPISODES = 5
     LOG_EVERY = 1
-    SEED = 2
+    SEED = 0
     np.random.seed(SEED)
     env = Slime(SEED, **params)
     env_vis = SlimeVisualizer(env.W_pixels, env.H_pixels, **params_visualizer)
