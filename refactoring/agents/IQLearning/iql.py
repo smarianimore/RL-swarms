@@ -130,6 +130,7 @@ def train(
     old_s = {}  # DOC old state for each agent {agent: old_state}
     old_a = {}
     actions = [4, 5]
+    scatter_actions = np.array([0, 1, 3])
     best_cluster_reward = 0.0
     AGENTS_NUM = env.cluster_learners + env.scatter_learners
     only_cluster_dict = {str(ep): 0.0 for ep in range(1, train_episodes + 1)}
@@ -168,7 +169,10 @@ def train(
                 #print(actions[action])
                 #breakpoint()
                 #env.step(actions[action])
-                env.step(action)
+                if env.learners[int(agent)]["mode"] == 's':
+                    env.step(scatter_actions[action].item())
+                else:
+                    env.step(action)
 
                 old_s[agent] = cur_s
                 old_a[agent] = action
@@ -285,8 +289,8 @@ def eval(
     ):
     # DOC Evaluate agent's performance after Q-learning
     #n_actions = env.actions_n()
-
     actions = [4, 5]
+    scatter_actions = np.array([0, 1, 3])
     AGENTS_NUM = env.cluster_learners + env.scatter_learners
     only_cluster_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
     mixed_cluster_dict = {str(ep): 0.0 for ep in range(1, test_episodes + 1)}
@@ -302,10 +306,15 @@ def eval(
                 state, reward, _, _, _ = env.last(agent)
                 s = env.convert_observation2(state)
                 action = np.argmax(qtable[int(agent)][s])
-                env.step(action)
+                
+                #env.step(action)
                 #print(actions[action])
                 #breakpoint()
                 #env.step(actions[action])
+                if env.learners[int(agent)]["mode"] == 's':
+                    env.step(scatter_actions[action].item())
+                else:
+                    env.step(action)
                 
                 if env.learners[int(agent)]["mode"] == 'c':
                     cluster_actions_dict[str(ep)][str(action)] += 1

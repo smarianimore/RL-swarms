@@ -1293,8 +1293,8 @@ def main():
     params = {
         "population": 0,
         #"learner_population": 50,
-        "cluster_learners": 2,
-        "scatter_learners": 2,
+        "cluster_learners": 5,
+        "scatter_learners": 5,
         "actions": [
             "move-toward-chemical",
             "random-walk",
@@ -1325,12 +1325,11 @@ def main():
         "cluster_penalty": 0,
         "scatter_rew": 0,
         "scatter_penalty": -10,
-        #"episode_ticks": 500,
-        "episode_ticks": 5,
+        "episode_ticks": 500,
         #"W": 16,
-        "W": 22,
+        "W": 19,
         #"H": 16,
-        "H": 22,
+        "H": 19,
         "PATCH_SIZE": 20,
         #"PATCH_SIZE": 4,
         "TURTLE_SIZE": 16,
@@ -1378,13 +1377,13 @@ def main():
                 #action = 2
                 #action = random.choice(actions)
                 env.step(action)
-            #env_vis.render(
-            #    env.patches,
-            #    env.learners,
-            #    # For debugging
-            #    env.fov,
-            #    env.ph_fov
-            #)
+            env_vis.render(
+                env.patches,
+                env.learners,
+                # For debugging
+                env.fov,
+                env.ph_fov
+            )
             #breakpoint()
         env.avg_cluster2()
 
