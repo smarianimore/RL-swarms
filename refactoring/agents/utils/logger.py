@@ -34,7 +34,7 @@ class Logger:
         if not os.path.isdir(weights_dir):
             os.makedirs(weights_dir)
         if train:
-            weights_filename = log_params[mode + "_weights_file"] + '_' + params["reward_type"] + '_' + time_now + WEIGHTS_FILE_EXTENSION 
+            weights_filename = log_params[mode + "_weights_file"] + '_' + time_now + WEIGHTS_FILE_EXTENSION 
             #self.weights_file = os.path.join(output_dir, weights_filename)
             self.weights_file = os.path.join(weights_dir, weights_filename)
         else:
