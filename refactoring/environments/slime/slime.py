@@ -859,11 +859,14 @@ class Slime(AECEnv):
 
     def _find_non_max_pheromone(self, agent, obs):
         f, direction = self._get_new_positions(self.ph_fov, agent)
-        ids = np.where(obs >= self.sniff_threshold)[0]
-        if ids.shape[0] == obs.shape[0]:
+        ids = np.where(obs < self.sniff_threshold)[0]
+        
+        #if ids.shape[0] == obs.shape[0]:
+        if ids.shape[0] == 0:
             idx = obs.argmin()
         else:
             idx = np.random.choice(ids)
+
         #ph_val = obs[idx]
         ph_pos = tuple(f[idx])
         if self.sniff_patches < self.N_DIRS:
@@ -880,7 +883,16 @@ class Slime(AECEnv):
         cluster = -1
         for p in self.cluster_patches[self.learners[current_agent]['pos']]:
             cluster += len(self.patches[p]['turtles'])
-
+        
+        #if self.learners[current_agent]["mode"] == 's':
+        #    for p in self.cluster_patches[self.learners[current_agent]['pos']]:
+        #        cluster += len(self.patches[p]['turtles'])
+        #elif self.learners[current_agent]["mode"] == 'c': 
+        #    for p in self.cluster_patches[self.learners[current_agent]['pos']]:
+        #        for t in self.patches[p]['turtles']:
+        #            if self.learners[t]["mode"] == 'c':
+        #                cluster += 1 
+        
         return cluster
 
     #def avg_cluster(self):
