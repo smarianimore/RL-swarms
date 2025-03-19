@@ -128,18 +128,23 @@ class Logger:
             ]
             metrics.extend(double_agent_metrics)
 
-        metrics.append("Cluster avg reward X episode") 
-        for a in params["actions"]:
-            metrics.append("Cluster " + a)
+        # Clustering
+        if params["cluster_learners"] > 0:
+            metrics.append("Cluster avg reward X episode") 
+            for a in params["actions"]:
+                metrics.append("Cluster " + a)
+            for l in range(params["cluster_learners"]):
+                for a in params["actions"]:
+                    metrics.append(f"(cluster_learner {l})-{a}")
 
-        #if not train:
-        #    for l in range(params['population'], params['population'] + params['learner_population']):
-        #        for a in params["actions"]:
-        #            metrics.append(f"(learner {l})-{a}")
-        
-        metrics.append("Scatter avg reward X episode") 
-        for a in params["actions"]:
-            metrics.append("Scatter " + a)
+        # Scattering
+        if params["scatter_learners"] > 0:
+            metrics.append("Scatter avg reward X episode") 
+            for a in params["actions"]:
+                metrics.append("Scatter " + a)
+            for l in range(params["scatter_learners"]):
+                for a in params["actions"]:
+                    metrics.append(f"(scatter_learner {l})-{a}")
 
         if train:
             metrics.append("Epsilon")

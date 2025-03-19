@@ -70,6 +70,7 @@ def main(args):
         ) = iql.create_agent(params, l_params, n_obs, n_actions, args.train)
         logger, train_log_every = create_logger(curdir, params, l_params, log_params, args.train)
 
+        PRINT_METRICS = 30
         train_start = datetime.datetime.now()
         qtable = iql.train(
             env,
@@ -90,6 +91,7 @@ def main(args):
             decay,
             epsilon,
             epsilon_min,
+            PRINT_METRICS,
             logger,
             env_vis
         )
