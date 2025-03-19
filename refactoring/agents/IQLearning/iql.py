@@ -207,7 +207,6 @@ def train(
                 visualizer.render(
                     env.patches,
                     env.learners,
-                    env.turtles,
                     env.fov,
                     env.ph_fov
                 )
