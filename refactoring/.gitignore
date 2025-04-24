@@ -1,2 +1,5 @@
 runs
 server_runs
+imgs/
+paper_imgs/
+*.ipynb
