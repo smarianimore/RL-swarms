@@ -1,5 +1,9 @@
-runs
+runs/
+runs_part1/
+runs_part2/
 server_runs
 imgs/
 paper_imgs/
+configs_done/
 *.ipynb
+*.txt
