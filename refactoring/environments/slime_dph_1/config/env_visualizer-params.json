@@ -1,0 +1,13 @@
+{
+    "FPS": 15,
+    "SHADE_STRENGTH": 10,
+    "SHOW_CHEM_TEXT": false,
+    "CLUSTER_FONT_SIZE": 12,
+    "CHEMICAL_FONT_SIZE": 8,
+    "sniff_threshold": 0.9,
+    "PATCH_SIZE": 20,
+    "TURTLE_SIZE": 16,
+    "show_dirs_view": false,
+    "wiggle_patches": 5,
+    "show_ph_view": false
+}
