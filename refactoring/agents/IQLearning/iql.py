@@ -149,7 +149,7 @@ def train(
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', position=1, leave=False):
             for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 cur_state, reward, _, _, _ = env.last(agent)
-                cur_s = env.convert_observation2(cur_state)
+                cur_s = env.convert_observation(cur_state)
 
                 if ep == 1 and tick == 1:
                     #action = env.action_space(agent).sample()
@@ -190,14 +190,14 @@ def train(
                     scatter_reward_dict[str(ep)][str(agent)] += round(reward, 2)
                 
             if env.cluster_learners == 0 or env.scatter_learners == 0:
-                cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
+                cluster_dict[str(ep)] += round(env.avg_cluster(), 2) 
             else:
                 (
                     avg_only_cluster,
                     avg_mixed_cluster,
                     avg_only_scatter,
                     avg_mixed_scatter
-                ) = env.avg_cluster2()
+                ) = env.avg_cluster()
                 only_cluster_dict[str(ep)] += round(avg_only_cluster, 2)
                 mixed_cluster_dict[str(ep)] += round(avg_mixed_cluster, 2)
                 only_scatter_dict[str(ep)] += round(avg_only_scatter, 2)
@@ -310,7 +310,7 @@ def eval(
         for tick in tqdm(range(1, params['episode_ticks'] + 1), desc="TICKS", colour='green', leave=False):
             for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 state, reward, _, _, _ = env.last(agent)
-                s = env.convert_observation2(state)
+                s = env.convert_observation(state)
                 action = np.argmax(qtable[int(agent)][s])
                 
                 #env.step(action)
@@ -333,14 +333,14 @@ def eval(
                     scatter_reward_dict[str(ep)][str(agent)] += round(reward, 2)
             
             if env.cluster_learners == 0 or env.scatter_learners == 0:
-                cluster_dict[str(ep)] += round(env.avg_cluster2(), 2) 
+                cluster_dict[str(ep)] += round(env.avg_cluster(), 2) 
             else:
                 (
                     avg_only_cluster,
                     avg_mixed_cluster,
                     avg_only_scatter,
                     avg_mixed_scatter
-                ) = env.avg_cluster2()
+                ) = env.avg_cluster()
                 only_cluster_dict[str(ep)] += round(avg_only_cluster, 2)
                 mixed_cluster_dict[str(ep)] += round(avg_mixed_cluster, 2)
                 only_scatter_dict[str(ep)] += round(avg_only_scatter, 2)
