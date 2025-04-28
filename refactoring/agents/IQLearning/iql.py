@@ -4,7 +4,6 @@ import numpy as np
 from tqdm import tqdm
 
 def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
-    population = params['population']
     learner_population = params["cluster_learners"] + params["scatter_learners"]
     episodes =  l_params["train_episodes"] if train else l_params["test_episodes"]
     # DOC dict che tiene conto della frequenza di scelta delle action per ogni episodio {episode: {action: _, action: _, ...}}
@@ -27,14 +26,14 @@ def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
             str(ag): {
                 str(ac): 0 
                 for ac in range(n_actions)
-            } for ag in range(population, population + params["cluster_learners"])
+            } for ag in range(params["cluster_learners"])
         } for ep in range(1, episodes + 1)
     }
     # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
     cluster_reward_dict = {
         str(ep): {
             str(ag): 0 
-            for ag in range(population, population + params["cluster_learners"])
+            for ag in range(params["cluster_learners"])
         }
         for ep in range(1, episodes + 1)
     }
@@ -51,14 +50,14 @@ def create_agent(params: dict, l_params: dict, n_obs, n_actions, train):
             str(ag): {
                 str(ac): 0 
                 for ac in range(n_actions)
-            } for ag in range(population + params["cluster_learners"], learner_population)
+            } for ag in range(params["cluster_learners"], learner_population)
         } for ep in range(1, episodes + 1)
     }
     # DOC dict che tiene conto della reward di ogni agente per ogni episodio {episode: {agent: _}}
     scatter_reward_dict = {
         str(ep): {
             str(ag): 0 
-            for ag in range(population + params["cluster_learners"], learner_population)
+            for ag in range(params["cluster_learners"], learner_population)
         }
         for ep in range(1, episodes + 1)
     }
@@ -168,14 +167,11 @@ def train(
                     else:
                         action = np.argmax(qtable[int(agent)][cur_s])
 
-                #print(actions[action])
-                #breakpoint()
-                #env.step(actions[action])
-                if env.learners[int(agent)]["mode"] == 's':
-                    env.step(scatter_actions[action].item())
-                else:
-                    env.step(action)
-                #env.step(action)
+                #if env.learners[int(agent)]["mode"] == 's':
+                #    env.step(scatter_actions[action].item())
+                #else:
+                #    env.step(action)
+                env.step(action)
 
                 old_s[agent] = cur_s
                 old_a[agent] = action
@@ -313,15 +309,11 @@ def eval(
                 s = env.convert_observation(state)
                 action = np.argmax(qtable[int(agent)][s])
                 
-                #env.step(action)
-                #print(actions[action])
-                #breakpoint()
-                #env.step(actions[action])
-                if env.learners[int(agent)]["mode"] == 's':
-                    env.step(scatter_actions[action].item())
-                else:
-                    env.step(action)
-                #env.step(action)
+                #if env.learners[int(agent)]["mode"] == 's':
+                #    env.step(scatter_actions[action].item())
+                #else:
+                #    env.step(action)
+                env.step(action)
                 
                 if env.learners[int(agent)]["mode"] == 'c':
                     cluster_actions_dict[str(ep)][str(action)] += 1

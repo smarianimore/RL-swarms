@@ -533,60 +533,6 @@ class Slime(AECEnv):
         elif self.obs_type == "variation1":
             pass
 
-    #def _find_non_max_pheromone(self, agent, observations):
-    #    obs = observations[:-1]
-    #    f, direction = self._get_new_positions(self.ph_fov, agent)
-    #    ids = np.where(obs < self.sniff_threshold)[0]
-    #    
-    #    if ids.shape[0] == 0:
-    #        idx = obs.argmin()
-    #    else:
-    #        idx = np.random.choice(ids)
-
-    #    ph_pos = tuple(f[idx])
-    #    
-    #    if self.sniff_patches < self.N_DIRS:
-    #        ph_dir = self._get_new_direction(self.sniff_patches, direction, idx)
-    #    else:
-    #        ph_dir = idx
-    #        #ph_dir = idx % self.sniff_patches
-    #    return ph_pos, ph_dir
-    
-    #def _avoid_pheromone(self, patches, ph_coords, ph_dir, turtle):
-    #    """
-    #    Action 3: avoid the pheromone.
-    #    """
-    #    patches[turtle['pos']]['turtles'].remove(self.agent)
-    #    turtle["pos"] = ph_coords
-    #    patches[turtle['pos']]['turtles'].append(self.agent)
-    #    turtle["dir"] = ph_dir
-    #    return patches, turtle
-
-    #def do_action4(self):
-    #    if np.any(self.observations[str(self.agent)] >= self.sniff_threshold):
-    #        if self.obs_type == "paper":
-    #            #if self.learners[self.agent]['mode'] == 'c':
-    #            #    obs = self.observations[str(self.agent)][:self.sniff_patches] 
-    #            #elif self.learners[self.agent]['mode'] == 's': 
-    #            #    obs = self.observations[str(self.agent)][self.sniff_patches:]      
-    #            ph_pos, ph_dir = self._find_non_max_pheromone(self.learners[self.agent], self.observations[str(self.agent)])
-    #            self.patches, self.learners[self.agent] = self._avoid_pheromone(
-    #                self.patches,
-    #                ph_pos,
-    #                ph_dir,
-    #                self.learners[self.agent]
-    #            )
-    #        elif self.obs_type == "variation1":
-    #            ph_pos, ph_dir = self._find_non_max_pheromone2(self.learners[self.agent], self.observations[str(self.agent)])
-    #            self.patches, self.learners[self.agent] = self._avoid_pheromone(
-    #                self.patches,
-    #                ph_pos,
-    #                ph_dir,
-    #                self.learners[self.agent]
-    #            )
-    #    else:
-    #        self.do_action0()
-
     def _diffuse_and_evaporate(self, patches):
         """
         This diffuse method use a gaussian filter for the process.
@@ -638,14 +584,6 @@ class Slime(AECEnv):
             self.do_action2()
         elif action == 3:   # Follow pheromone 1
             self.do_action3()
-        #elif action == 4:   # Don't follow pheromone
-        #    self.do_action4()
-        #elif action == 4:   # Walk and Lay pheromone
-        #    self.do_action0()
-        #    self.do_action1()
-        #elif action == 5:   # Follow pheromone and Lay pheromone 
-        #    self.do_action2()
-        #    self.do_action1()
         else:
             raise ValueError("Action out of range!")
 

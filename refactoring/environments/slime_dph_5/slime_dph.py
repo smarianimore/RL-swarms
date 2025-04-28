@@ -169,10 +169,10 @@ class Slime(AECEnv):
         self.obs_type = kwargs['obs_type']
         # DOC obervation is an array of 8 real elements.
         # This array indicates the pheromone values in the 8 patches around the agent.
-
+        
         if self.obs_type == "paper":
             self._observation_spaces = {
-                a: Box(low=0.0, high=np.inf, shape=(self.sniff_patches + 1,), dtype=np.float32)
+                a: Box(low=0.0, high=np.inf, shape=(self.sniff_patches * 2,), dtype=np.float32)
                 for a in self.possible_agents
             }
         elif self.obs_type == "variation1":
@@ -273,7 +273,7 @@ class Slime(AECEnv):
         start = (old_dir - (n_patches // 2)) % self.N_DIRS 
         new_dirs = np.array([(i + start) % self.N_DIRS for i in range(n_patches)])
         return new_dirs[idx_dir]
-    
+
     def _compute_cluster_for_clustering(self, current_agent):
         # Versione 1: qui considero il cluster essere formato solo da agenti del mio stesso tipo. 
         #cluster = -1
@@ -307,7 +307,7 @@ class Slime(AECEnv):
         for p in self.cluster_patches[self.learners[current_agent]['pos']]:
             cluster += len(self.patches[p]['turtles'])
 
-        return cluster        
+        return cluster
 
     #def _compute_cluster(self, current_agent):
     #    """
@@ -315,9 +315,9 @@ class Slime(AECEnv):
     #    """
     #    #cluster = 0
     #    cluster = -1
-    #    #if self.learners[self.agent]["mode"] == 's':
-    #    #    for p in self.cluster_patches[self.learners[current_agent]['pos']]:
-    #    #        cluster += len(self.patches[p]['turtles'])
+    #    if self.learners[self.agent]["mode"] == 's':
+    #        for p in self.cluster_patches[self.learners[current_agent]['pos']]:
+    #            cluster += len(self.patches[p]['turtles'])
 
     #    # Versione 2: qui ho una penalità, calcolo i cluster "corretto" e sottraggo quello "sbagliato". 
     #    #elif self.learners[self.agent]["mode"] == 'c':
@@ -333,11 +333,6 @@ class Slime(AECEnv):
     #    #    elif self.learners[current_agent]['mode'] == 's':
     #    #        cluster = clusters['ph_2'] - clusters['ph_1']
 
-    #    # Versione 1: qui considero il cluster essere formato solo da agenti del mio stesso tipo. 
-    #    for p in self.cluster_patches[self.learners[current_agent]['pos']]:
-    #        for t in self.patches[p]['turtles']:
-    #            if self.learners[current_agent]['mode'] == self.learners[t]['mode']:
-    #                cluster += 1
 
     #    #breakpoint()
     #    return cluster
@@ -382,28 +377,9 @@ class Slime(AECEnv):
     def _get_obs2(self, agent):
         f, _ = self._get_new_positions(self.ph_fov, agent)
 
-        obs_ph_0 = np.array([self.patches[tuple(i)]["chemical_0"] for i in f])
-        obs_ph_1 = np.array([self.patches[tuple(i)]["chemical_1"] for i in f])
-        
-        # Qui considero come osservazione solo il feromone più forte, se sono uguali
-        # confronto la norma o scelgo a caso. 
-        #breakpoint()
-        count0 = np.int8(obs_ph_0 > obs_ph_1).sum() 
-        count1 = np.int8(obs_ph_1 > obs_ph_0).sum() 
-        if count0 == count1:
-            if np.linalg.norm(obs_ph_0) > np.linalg.norm(obs_ph_1):
-                obs = np.append(obs_ph_0, 0.0)
-            elif np.linalg.norm(obs_ph_1) > np.linalg.norm(obs_ph_0):
-                obs = np.append(obs_ph_1, 1.0)
-            else:
-                idx = random.randint(0, 1)
-                tmp = (obs_ph_0, obs_ph_1)
-                obs = np.append(tmp[idx], idx)
-        elif count0 > count1:
-            obs = np.append(obs_ph_0, 0.0)
-        elif count1 > count0:
-            obs = np.append(obs_ph_1, 1.0)
-
+        obs_ph_0 = [self.patches[tuple(i)]["chemical_0"] for i in f]
+        obs_ph_1 = [self.patches[tuple(i)]["chemical_1"] for i in f]
+        obs = np.array(obs_ph_0 + obs_ph_1)
         return obs
     
     def process_agent(self, cluster_ticks, rewards_cust):
@@ -525,8 +501,25 @@ class Slime(AECEnv):
         if self.obs_type == "paper":
             max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
                 self.learners[self.agent],
-                self.observations[str(self.agent)][:-1]    
-                #obs
+                self.observations[str(self.agent)][:self.sniff_patches]        
+            )
+            if max_pheromone >= self.sniff_threshold:
+                self.patches, self.learners[self.agent] = self._follow_pheromone2(
+                    self.patches,
+                    max_coords,
+                    max_ph_dir,
+                    self.learners[self.agent]
+                )
+            else:
+                self.do_action0()
+        elif self.obs_type == "variation1":
+            pass
+    
+    def do_action3(self):
+        if self.obs_type == "paper":
+            max_pheromone, max_coords, max_ph_dir = self._find_max_pheromone2(
+                self.learners[self.agent],
+                self.observations[str(self.agent)][self.sniff_patches:]        
             )
             if max_pheromone >= self.sniff_threshold:
                 self.patches, self.learners[self.agent] = self._follow_pheromone2(
@@ -550,15 +543,17 @@ class Slime(AECEnv):
             idx = np.random.choice(ids)
 
         ph_pos = tuple(f[idx])
+        
         if self.sniff_patches < self.N_DIRS:
             ph_dir = self._get_new_direction(self.sniff_patches, direction, idx)
         else:
             ph_dir = idx
+            #ph_dir = idx % self.sniff_patches
         return ph_pos, ph_dir
     
     def _avoid_pheromone(self, patches, ph_coords, ph_dir, turtle):
         """
-        Action 3: avoid the pheromone.
+        Avoid the pheromone.
         """
         patches[turtle['pos']]['turtles'].remove(self.agent)
         turtle["pos"] = ph_coords
@@ -566,12 +561,12 @@ class Slime(AECEnv):
         turtle["dir"] = ph_dir
         return patches, turtle
 
-    def do_action3(self):
+    def do_action4(self):
         if np.any(self.observations[str(self.agent)] >= self.sniff_threshold):
             if self.obs_type == "paper":
                 ph_pos, ph_dir = self._find_non_max_pheromone(
-                    self.learners[self.agent],
-                    self.observations[str(self.agent)][:-1]
+                    self.learners[self.agent], 
+                    self.observations[str(self.agent)][:self.sniff_patches]        
                 )
                 self.patches, self.learners[self.agent] = self._avoid_pheromone(
                     self.patches,
@@ -580,13 +575,25 @@ class Slime(AECEnv):
                     self.learners[self.agent]
                 )
             elif self.obs_type == "variation1":
-                ph_pos, ph_dir = self._find_non_max_pheromone2(self.learners[self.agent], self.observations[str(self.agent)])
+                pass
+        else:
+            self.do_action0()
+    
+    def do_action5(self):
+        if np.any(self.observations[str(self.agent)] >= self.sniff_threshold):
+            if self.obs_type == "paper":
+                ph_pos, ph_dir = self._find_non_max_pheromone(
+                    self.learners[self.agent], 
+                    self.observations[str(self.agent)][self.sniff_patches:]        
+                )
                 self.patches, self.learners[self.agent] = self._avoid_pheromone(
                     self.patches,
                     ph_pos,
                     ph_dir,
                     self.learners[self.agent]
                 )
+            elif self.obs_type == "variation1":
+                pass
         else:
             self.do_action0()
 
@@ -637,10 +644,14 @@ class Slime(AECEnv):
             self.do_action0()
         elif action == 1:   # Lay pheromone
             self.do_action1()
-        elif action == 2:   # Follow pheromone
+        elif action == 2:   # Follow pheromone 0
             self.do_action2()
-        elif action == 3:   # Don't follow pheromone
+        elif action == 3:   # Follow pheromone 1
             self.do_action3()
+        elif action == 4:   # Don't follow pheromone 0
+            self.do_action4()
+        elif action == 5:   # Don't follow pheromone 1
+            self.do_action5()
         else:
             raise ValueError("Action out of range!")
 
@@ -691,7 +702,7 @@ class Slime(AECEnv):
         
         if self.obs_type == "paper":
             self.observations = {
-                a: np.zeros(self.sniff_patches + 1, dtype=np.float32)
+                a: np.zeros(self.sniff_patches * 2, dtype=np.float32)
                 for a in self.agents
             }
         elif self.obs_type == "variation1":
@@ -700,23 +711,20 @@ class Slime(AECEnv):
         self._agent_selector.reinit(self.agents)
         self.agent_selection = self._agent_selector.next()
     
-    def convert_observation2(self, observations):
+    def convert_observation(self, obs):
         """
         This method returns the conversion of the observation to an integer.
         It's useful for IQL.
         """
-        #breakpoint()
-        obs = observations[:-1]
-        pos = observations[-1]
-        
+
         if self.obs_type == "paper":
             if np.unique(obs).shape[0] == 1:
-                obs_id = np.random.randint(self.sniff_patches) + int(pos * self.sniff_patches)
+                obs_id = np.random.randint(self.sniff_patches * 2)
             else:
-                obs_id = obs.argmax().item() + int(pos * self.sniff_patches)
+                obs_id = obs.argmax() 
         elif self.obs_type == "variation1":
             pass
-
+        
         return obs_id
     
     def _compute_avg_cluster(self, clusters):
@@ -759,7 +767,7 @@ class Slime(AECEnv):
         
         return only_cluster, mixed_cluster, only_scatter, mixed_scatter
 
-    def avg_cluster2(self):
+    def avg_cluster(self):
         """
         Same compuation as avg_cluster.
         Use THIS for calculating the average, avg_cluster has a bug!
@@ -991,11 +999,10 @@ def main():
         "actions": [
             "random-walk",
             "drop-chemical",
-            "move-toward-chemical",
-            "move-away-chemical",
-            #"move-and-drop",
-            #"walk-and-drop",
-            #"stay-still"
+            "move-toward-chemical-0",
+            "move-toward-chemical-1",
+            "move-away-chemical-0",
+            "move-away-chemical-1",
         ],
         "sniff_threshold": 0.9,
         "sniff_patches": 5, 
@@ -1053,7 +1060,8 @@ def main():
         for tick in tqdm(range(params['episode_ticks']), desc="Tick", leave=False):
             for agent in env.agent_iter(max_iter=AGENTS_NUM):
                 observation, reward, _ , _, info = env.last(agent)
-                id = env.convert_observation2(observation)
+                #breakpoint()
+                id = env.convert_observation(observation)
                 action = np.random.randint(0, ACTION_NUM)
                 env.step(action)
             env_vis.render(
@@ -1063,7 +1071,7 @@ def main():
                 env.ph_fov
             )
             #breakpoint()
-        avg_cluster = env.avg_cluster2()
+        avg_cluster = env.avg_cluster()
 
     print("Total time = ", time.time() - start_time)
     env.close()

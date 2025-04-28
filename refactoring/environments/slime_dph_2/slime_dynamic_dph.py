@@ -355,14 +355,8 @@ class Slime(AECEnv):
             self.do_action2()
         elif action == 2:   # Don't follow pheromone
             self.do_action3()
-        elif action == 3:
-            pass
-        #elif action == 4:   # Walk and Lay pheromone
-        #    self.do_action0()
-        #    self.do_action1()
-        #elif action == 5:   # Follow pheromone and Lay pheromone 
-        #    self.do_action2()
-        #    self.do_action1()
+        #elif action == 3:
+        #    pass
         else:
             raise ValueError("Action out of range!")
 
@@ -412,31 +406,6 @@ class Slime(AECEnv):
 
         return observations, cluster_ticks, rewards_cust
 
-    #def _get_obs(self, pos):
-    #    """
-    #    This method return the observation give by the env.
-    #    The array indicates the pheromone values in the 8 patches around the agent.
-    #    """
-    #    field_of_view = [
-    #        self._wrap(r, c)
-    #        for r in range(pos[0] - self.patch_size, pos[0] + 2 * self.patch_size, self.patch_size)
-    #        for c in range(pos[1] - self.patch_size, pos[1] + 2 * self.patch_size, self.patch_size)
-    #    ]
-    #    field_of_view.remove(pos)
-    #    obs = np.array([self.patches[f]["chemical"] for f in field_of_view])
-    #    return obs 
-
-    #def _get_obs4(self, agent):
-    #    f, _ = self._get_new_positions(self.ph_fov, agent)
-    #    obs = np.array([self.patches[tuple(i)]["chemical"] for i in f])
-    #    return obs
-
-    #def _get_obs5(self, agent):
-    #    f, _ = self._get_new_positions(self.ph_fov, agent)
-    #    obs = [self.patches[tuple(i)]["chemical"] for i in f]
-    #    obs.append(self.patches[agent["pos"]]["chemical"])
-    #    return np.array(obs)
-    
     def _get_obs2(self, agent):
         f, _ = self._get_new_positions(self.ph_fov, agent)
         obs = [self.patches[tuple(i)]["chemical"] for i in f]
