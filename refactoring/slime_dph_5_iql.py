@@ -199,14 +199,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--params_path",
         type=str,
-        default="environments/slime_dph_4/config/env-params.json",
+        default="environments/slime_dph_5/config/env-params.json",
         required=False
     )
 
     parser.add_argument(
         "--visualizer_params_path",
         type=str,
-        default="environments/slime_dph_4/config/env_visualizer-params.json",
+        default="environments/slime_dph_5/config/env_visualizer-params.json",
         required=False
     )
     
