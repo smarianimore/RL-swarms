@@ -4,7 +4,7 @@ import argparse
 import json
 import numpy as np
 import random
-from environments.slime_dph_5.slime_dph import Slime
+from environments.slime_dph_6.slime_dph import Slime
 from agents.IQLearning import iql
 
 def read_params(params_path: str, learning_params_path: str, visualizer_params_path: str, logger_params_path):
@@ -67,7 +67,7 @@ def main(args):
 
     env = Slime(args.random_seed, **params)
     if args.render:
-        from environments.slime_dph_5.slime_dph import SlimeVisualizer
+        from environments.slime_dph_6.slime_dph import SlimeVisualizer
         env_vis = SlimeVisualizer(env.W_pixels, env.H_pixels, **v_params)
     else:
         env_vis = None
@@ -199,14 +199,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--params_path",
         type=str,
-        default="environments/slime_dph_5/config/env-params.json",
+        default="environments/slime_dph_6/config/env-params.json",
         required=False
     )
 
     parser.add_argument(
         "--visualizer_params_path",
         type=str,
-        default="environments/slime_dph_5/config/env_visualizer-params.json",
+        default="environments/slime_dph_6/config/env_visualizer-params.json",
         required=False
     )
     
