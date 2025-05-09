@@ -1,0 +1,11 @@
+{
+    "train_log_every": 1,
+    "test_log_every": 1,
+    "train_params_file": "iql_train_params",
+    "train_output_file": "iql_train_output",
+    "train_weights_file": "iql_train_weights",
+    "eval_params_file": "iql_eval_params",
+    "eval_output_file": "iql_eval_output",
+    "deep_algorithm": false,
+    "buffer_size": 10000
+}

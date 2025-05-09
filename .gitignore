@@ -4,4 +4,4 @@
 **/models/*
 build/
 dist/
-slime_environments.egg-info/
+rl_swarms.egg-info/

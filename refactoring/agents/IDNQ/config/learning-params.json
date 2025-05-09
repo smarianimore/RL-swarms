@@ -1,0 +1,14 @@
+{
+    "replay_memory_size": 100000,
+    "mini_bach_size": 64,
+    "policy_sync_rate": 128,
+    "hidden_dim": 4,
+    "epsilon_init": 1.0,
+    "epsilon_min": 0.05,
+    "decay": 0.9995,
+    "decay_type": "log",
+    "learning_rate_a": 0.0001,
+    "discount_factor_g": 0.99,
+    "train_episodes": 10000,
+    "test_episodes": 2000
+}

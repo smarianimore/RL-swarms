@@ -1,0 +1,10 @@
+{
+    "alpha": 0.1,
+    "gamma": 0.99,
+    "epsilon": 1.0,
+    "epsilon_min": 0.01,
+    "decay_type": "log",
+    "decay": 0.9984,
+    "train_episodes": 3000,
+    "test_episodes": 2000
+}

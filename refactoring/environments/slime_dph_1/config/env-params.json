@@ -1,0 +1,31 @@
+{
+    "cluster_learners": 5,
+    "scatter_learners": 5,
+    "actions": [
+        "random-walk",
+        "move-toward-chemical",
+        "move-away-chemical"
+    ],
+    "sniff_threshold": 0.9,
+    "sniff_patches": 5,
+    "diffuse_area": 3.0,
+    "diffuse_radius": 5,
+    "follow_mode": "det",
+    "wiggle_patches": 5,
+    "lay_area": 5,
+    "lay_amount": 700,
+    "evaporation": 0.95,
+    "cluster_threshold": 1,
+    "cluster_radius": 1,
+    "obs_type": "variation1",
+    "normalize_rewards": false,
+    "cluster_rew": 10,
+    "cluster_penalty": -1,
+    "scatter_rew": 0,
+    "scatter_penalty": -1,
+    "episode_ticks": 500,
+    "W": 22,
+    "H": 22,
+    "PATCH_SIZE": 20,
+    "TURTLE_SIZE": 16
+}
